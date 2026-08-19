@@ -36,9 +36,7 @@ export const validateBreakoutPoints = ({
     .filter(([, count]) => count > 1)
     .map(([endpoint]) => endpoint)
   const layerInconsistencies = points
-    .filter(
-      (point) => layerByConnection[point.connectionId] !== point.layer,
-    )
+    .filter((point) => layerByConnection[point.connectionId] !== point.layer)
     .map((point) => `${point.regionId}:${point.connectionId}`)
   const bandViolations = points.filter((point) => {
     const band = bandByBus[point.busId]

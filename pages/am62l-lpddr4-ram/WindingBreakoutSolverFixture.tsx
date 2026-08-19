@@ -1,18 +1,16 @@
 import { GenericSolverDebugger } from "@tscircuit/solver-utils/react"
 import { useState } from "react"
 import { WindingBreakoutSolver } from "../../lib/index"
-import type { WindingBreakoutExample } from "../../lib/types"
+import type { WindingBreakoutSolverInput } from "../../lib/types"
 
 export function WindingBreakoutSolverFixture({
-  example,
+  input,
 }: {
-  readonly example: WindingBreakoutExample
+  readonly input: WindingBreakoutSolverInput
 }): React.JSX.Element {
   const [activeLayer, setActiveLayer] = useState("")
-  const [solver] = useState(() => new WindingBreakoutSolver(example))
-  const signalLayers = example.stackup.filter(
-    (entry) => entry.type === "signal",
-  )
+  const [solver] = useState(() => new WindingBreakoutSolver(input))
+  const signalLayers = input.stackup.filter((entry) => entry.type === "signal")
   return (
     <main style={{ minHeight: "100vh", background: "#fff" }}>
       <select

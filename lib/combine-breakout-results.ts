@@ -97,9 +97,7 @@ export const combineBreakoutResults = ({
       ...orderedResults.map((result) => result.routingLayerCount),
     ),
     breakoutPoints,
-    sharedGateSlots: orderedResults.flatMap(
-      (result) => result.sharedGateSlots,
-    ),
+    sharedGateSlots: orderedResults.flatMap((result) => result.sharedGateSlots),
     validation,
   }
   const reasons = [
