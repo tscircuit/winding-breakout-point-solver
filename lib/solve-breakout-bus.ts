@@ -50,7 +50,8 @@ export const solveBreakoutBus = ({
     atomicGroups,
   })
   const graph = buildWindingConflictGraph(connectionIds)
-  const hints = input.initialLayerByBus?.[busId] ?? input.initialLayerByConnection
+  const hints =
+    input.initialLayerByBus?.[busId] ?? input.initialLayerByConnection
   const coloring =
     getInitialLayerColoring({
       connectionIds,

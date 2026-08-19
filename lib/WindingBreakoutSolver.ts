@@ -6,6 +6,10 @@ import {
   WindingBreakoutOutputUnavailableError,
 } from "./input/errors"
 import {
+  createWindingBreakoutInputFromCircuitJson,
+  type WindingBreakoutCircuitJsonInput,
+} from "./input/create-winding-breakout-input-from-circuit-json"
+import {
   type ValidatedWindingInput,
   validateWindingBreakoutInput,
 } from "./input/validate-winding-breakout-input"
@@ -33,6 +37,14 @@ export class WindingBreakoutSolver extends BaseSolver {
   constructor(input: WindingBreakoutSolverInput) {
     super()
     this.input = input
+  }
+
+  static fromCircuitJson(
+    input: WindingBreakoutCircuitJsonInput,
+  ): WindingBreakoutSolver {
+    return new WindingBreakoutSolver(
+      createWindingBreakoutInputFromCircuitJson(input),
+    )
   }
 
   setVisualizationLayer(layer?: string): void {

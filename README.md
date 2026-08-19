@@ -8,17 +8,71 @@ staggered boundary points. It does not generate traces, dogbones, or vias.
 The package is currently private and has no publishing, deployment, or runtime
 network integration.
 
-## Usage
+## Core Circuit JSON input (recommended)
 
-The canonical example below is the same typed byte-0 input used by the tests and
-the React Cosmos debugger.
+Use ordinary tscircuit components to describe the board. Core's existing
+breakout solver creates the first-pass `pcb_breakout_point` records; the
+winding adapter matches records from different breakout groups when they have
+the same `source_trace_id`.
+
+```tsx
+import { Circuit } from "@tscircuit/core"
+import { WindingBreakoutSolver } from "@tscircuit/winding-breakout-point-solver"
+
+const circuit = new Circuit()
+circuit.add(
+  <board width="40mm" height="20mm" layers={8} routingDisabled>
+    <breakout name="SOC_BREAKOUT" pcbX={-10} padding="1mm">
+      <chip name="U1" footprint="soic8" />
+    </breakout>
+    <breakout name="RAM_BREAKOUT" pcbX={10} padding="1mm">
+      <chip name="U2" footprint="soic8" />
+    </breakout>
+    <trace name="DQ0" from="U1.pin1" to="U2.pin1" />
+    <trace name="DQS0" from="U1.pin2" to="U2.pin2" />
+    <trace name="DQS0_n" from="U1.pin3" to="U2.pin3" />
+  </board>,
+)
+
+await circuit.renderUntilSettled()
+
+const solver = WindingBreakoutSolver.fromCircuitJson({
+  circuitJson: circuit.getCircuitJson(),
+  breakoutGroupNames: ["SOC_BREAKOUT", "RAM_BREAKOUT"],
+})
+solver.solve()
+const output = solver.getOutput()
+```
+
+The adapter derives group bounds, source-pad positions, facing edges, pad
+layer, routing layers, and breakout spacing from Circuit JSON. A named source
+trace becomes the public connection id; unnamed traces use their
+`source_trace_id`. `NAME`/`NAME_n` traces are recognized as differential pairs.
+
+When the circuit contains only one linked pair of breakout groups,
+`breakoutGroupNames` can be omitted. Use `connectionIds` to select a subset of
+the automatically linked traces. Explicit stackups, bus bands, layer hints,
+and other advanced controls remain available through `stackup`, `layerNames`,
+and `solverOverrides`.
+
+`detectLinkedBreakoutPointPairs(circuitJson)` exposes the detected links for
+debugging. A link is intentionally point-to-point: exactly two breakout points
+must share a source trace and belong to different PCB groups.
+
+## Core-rendered AM62L examples
+
+The four AM62L examples are async factories because they render one shared core
+circuit before selecting a byte lane, the control bus, or all 33 connections.
+The example below is the same byte-0 input used by the tests and React Cosmos
+debugger.
 
 ```ts
 import {
-  ddrByte0Example,
-  WindingBreakoutSolver,
-} from "@tscircuit/winding-breakout-point-solver"
+  createDdrByte0Example,
+} from "@tscircuit/winding-breakout-point-solver/examples/am62l"
+import { WindingBreakoutSolver } from "@tscircuit/winding-breakout-point-solver"
 
+const ddrByte0Example = await createDdrByte0Example()
 const solver = new WindingBreakoutSolver(ddrByte0Example)
 solver.solve()
 
@@ -29,6 +83,11 @@ if (solver.failed) {
 const output = solver.getOutput()
 const graphics = solver.visualize()
 ```
+
+The low-level `new WindingBreakoutSolver(input)` constructor remains available
+for already-normalized inputs. New tscircuit integrations should prefer
+`fromCircuitJson` so component geometry and paired endpoints are not duplicated
+in application code.
 
 `getOutput()` is intentionally unavailable until a successful terminal state.
 When `allowDiagnosticBestEffort` is enabled, an infeasible placement remains
@@ -42,9 +101,10 @@ validation, ordering, layer assignment, breakpoint placement, per-bus
 validation, and combination steps. Call `step()`
 to inspect incremental progress or `solve()` to run to a terminal state.
 
-The public package exports the solver, its specific error classes, all input,
-output, geometry, validation, and example types, and the byte-0, byte-1, and
-full-link AM62L/LPDDR4 examples.
+The main package exports the solver, its specific error classes, and all input,
+output, geometry, validation, and example types. The core-rendered AM62L/LPDDR4
+example factories are available from the `/examples/am62l` subpath, keeping
+core and the example component libraries out of the low-level solver entrypoint.
 
 ## Local verification
 
@@ -58,9 +118,10 @@ git diff --check
 git remote -v
 ```
 
-The Cosmos page runs the exported solver directly with the canonical byte-0
-example and renders its `GraphicsObject`; its compact selector filters the
-displayed breakout points by signal layer.
+The Cosmos page renders the canonical tscircuit core design once, derives each
+of its four solver inputs from Circuit JSON, and renders the selected solver's
+`GraphicsObject`. Its compact selector filters the displayed breakout points by
+signal layer.
 
 ## Deployment
 

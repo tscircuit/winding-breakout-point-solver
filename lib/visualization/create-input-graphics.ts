@@ -87,8 +87,9 @@ export const createInputGraphics = (
       })
     }
 
-    for (const port of
-      !activeLayer || activeLayer === input.padLayer ? region.ports : []) {
+    for (const port of !activeLayer || activeLayer === input.padLayer
+      ? region.ports
+      : []) {
       const color = getConnectionColor(port.connectionId)
       graphics.circles.push({
         center: port.position,
