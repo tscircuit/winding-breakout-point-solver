@@ -61,3 +61,11 @@ git remote -v
 The Cosmos page runs the exported solver directly with the canonical byte-0
 example and renders its `GraphicsObject`; its compact selector filters the
 displayed breakout points by signal layer.
+
+## Deployment
+
+The React Cosmos debugger is deployed at
+[winding-breakout-point-solver.vercel.app](https://winding-breakout-point-solver.vercel.app).
+
+Vercel deploys `main` to production and creates a preview deployment for each
+pull request and non-production branch.
