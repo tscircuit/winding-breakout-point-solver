@@ -22,10 +22,28 @@ import { WindingBreakoutSolver } from "@tscircuit/winding-breakout-point-solver"
 const circuit = new Circuit()
 circuit.add(
   <board width="40mm" height="20mm" layers={8} routingDisabled>
-    <breakout name="SOC_BREAKOUT" pcbX={-10} padding="1mm">
+    <breakout
+      name="SOC_BREAKOUT"
+      pcbX={-10}
+      fanoutBoundaryPadding={{
+        top: "2mm",
+        right: "3mm",
+        bottom: "2mm",
+        left: "1mm",
+      }}
+    >
       <chip name="U1" footprint="soic8" />
     </breakout>
-    <breakout name="RAM_BREAKOUT" pcbX={10} padding="1mm">
+    <breakout
+      name="RAM_BREAKOUT"
+      pcbX={10}
+      fanoutBoundaryPadding={{
+        top: "2mm",
+        right: "1mm",
+        bottom: "2mm",
+        left: "3mm",
+      }}
+    >
       <chip name="U2" footprint="soic8" />
     </breakout>
     <trace name="DQ0" from="U1.pin1" to="U2.pin1" />
@@ -47,6 +65,10 @@ The adapter derives group bounds, source-pad positions, facing edges, pad
 layer, routing layers, and breakout spacing from Circuit JSON. A named source
 trace becomes the public connection id; unnamed traces use their
 `source_trace_id`. `NAME`/`NAME_n` traces are recognized as differential pairs.
+
+Padding remains a tscircuit concern rather than an adapter option. Core applies
+the asymmetric `fanoutBoundaryPadding` above to each `pcb_group`; the adapter
+uses the resulting group center, width, and height as the breakout boundary.
 
 The adapter expects one reciprocal pair of breakout groups and includes every
 linked trace between them. Bus bands, layer hints, and other controls that are
