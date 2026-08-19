@@ -67,10 +67,10 @@ export const Am62lLpddr4Circuit = (): React.JSX.Element => (
       pcbX={-10}
       pcbY={0}
       fanoutBoundaryPadding={{
-        top: "5mm",
-        right: "2mm",
-        bottom: "5mm",
-        left: "1mm",
+        top: "3mm",
+        right: "3mm",
+        bottom: "3mm",
+        left: "3mm",
       }}
       fanoutRoutingLayers={[...SIGNAL_LAYERS]}
       busFanoutDirections={{
@@ -95,10 +95,10 @@ export const Am62lLpddr4Circuit = (): React.JSX.Element => (
       pcbX={10.116917}
       pcbY={-0.050917}
       fanoutBoundaryPadding={{
-        top: "5mm",
-        right: "1mm",
-        bottom: "5mm",
-        left: "2mm",
+        top: "3mm",
+        right: "3mm",
+        bottom: "3mm",
+        left: "3mm",
       }}
       fanoutRoutingLayers={[...SIGNAL_LAYERS]}
       busFanoutDirections={{

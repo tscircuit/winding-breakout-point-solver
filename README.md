@@ -26,10 +26,10 @@ circuit.add(
       name="SOC_BREAKOUT"
       pcbX={-10}
       fanoutBoundaryPadding={{
-        top: "2mm",
+        top: "3mm",
         right: "3mm",
-        bottom: "2mm",
-        left: "1mm",
+        bottom: "3mm",
+        left: "3mm",
       }}
     >
       <chip name="U1" footprint="soic8" />
@@ -38,9 +38,9 @@ circuit.add(
       name="RAM_BREAKOUT"
       pcbX={10}
       fanoutBoundaryPadding={{
-        top: "2mm",
-        right: "1mm",
-        bottom: "2mm",
+        top: "3mm",
+        right: "3mm",
+        bottom: "3mm",
         left: "3mm",
       }}
     >
@@ -67,7 +67,7 @@ trace becomes the public connection id; unnamed traces use their
 `source_trace_id`. `NAME`/`NAME_n` traces are recognized as differential pairs.
 
 Padding remains a tscircuit concern rather than an adapter option. Core applies
-the asymmetric `fanoutBoundaryPadding` above to each `pcb_group`; the adapter
+the `3mm` `fanoutBoundaryPadding` above to each `pcb_group`; the adapter
 uses the resulting group center, width, and height as the breakout boundary.
 
 The adapter expects one reciprocal pair of breakout groups and includes every
