@@ -1,4 +1,3 @@
-import { Circuit } from "@tscircuit/core"
 import type { AnyCircuitElement } from "circuit-json"
 import { createWindingBreakoutInputFromCircuitJson } from "../../lib/input/create-winding-breakout-input-from-circuit-json"
 import type {
@@ -7,7 +6,7 @@ import type {
   WindingBreakoutExample,
   WindingBreakoutExampleMetadata,
 } from "../../lib/types"
-import { Am62lLpddr4Circuit } from "./am62l-circuit"
+import { AM62L_CIRCUIT_JSON } from "./am62l-circuit-json.generated"
 import {
   DDR_BUS_ORDER,
   DDR_CONNECTIONS,
@@ -39,20 +38,10 @@ const BUS_BANDS: Readonly<Record<DdrBusName, BreakoutBand>> = {
   DDR_BYTE0: { min: -4.25, max: -1.75, position: "lower" },
 }
 
-let circuitJsonPromise: Promise<readonly AnyCircuitElement[]> | undefined
-
-/** Render once so all four example variants share the same core output. */
-export const getAm62lCircuitJson = (): Promise<
+/** Compact snapshot produced from the canonical core circuit at development time. */
+export const getAm62lCircuitJson = async (): Promise<
   readonly AnyCircuitElement[]
-> => {
-  circuitJsonPromise ??= (async () => {
-    const circuit = new Circuit()
-    circuit.add(Am62lLpddr4Circuit())
-    await circuit.renderUntilSettled()
-    return circuit.getCircuitJson()
-  })()
-  return circuitJsonPromise
-}
+> => AM62L_CIRCUIT_JSON
 
 export const createAm62lExample = async (
   options: ExampleOptions,

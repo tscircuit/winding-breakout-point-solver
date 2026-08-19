@@ -61,10 +61,11 @@ must share a source trace and belong to different PCB groups.
 
 ## Core-rendered AM62L examples
 
-The four AM62L examples are async factories because they render one shared core
-circuit before selecting a byte lane, the control bus, or all 33 connections.
-The example below is the same byte-0 input used by the tests and React Cosmos
-debugger.
+The four AM62L examples are async factories backed by a compact, checked-in
+Circuit JSON snapshot generated from the canonical core circuit. They select a
+byte lane, the control bus, or all 33 connections without making the browser
+rerender the large AM62L circuit. The example below is the same byte-0 input
+used by the tests and React Cosmos debugger.
 
 ```ts
 import {
@@ -118,10 +119,14 @@ git diff --check
 git remote -v
 ```
 
-The Cosmos page renders the canonical tscircuit core design once, derives each
-of its four solver inputs from Circuit JSON, and renders the selected solver's
-`GraphicsObject`. Its compact selector filters the displayed breakout points by
-signal layer.
+After changing `examples/am62l/am62l-circuit.tsx` or its component versions,
+refresh the checked-in snapshot with
+`bun run generate:am62l-circuit-json && bun run format`.
+
+The Cosmos page reads the generated Circuit JSON snapshot, derives each of its
+four solver inputs, and renders the selected solver's `GraphicsObject` without
+running core in the browser. Its compact selector filters the displayed
+breakout points by signal layer.
 
 ## Deployment
 

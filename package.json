@@ -25,6 +25,7 @@
     "build:site": "cosmos-export",
     "format": "biome format --write .",
     "format:check": "biome format .",
+    "generate:am62l-circuit-json": "bun scripts/generate-am62l-circuit-json.ts",
     "test": "bun test --timeout 60000",
     "typecheck": "tsc --noEmit"
   },

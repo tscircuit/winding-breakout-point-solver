@@ -1,4 +1,3 @@
-export { Am62lLpddr4Circuit } from "./am62l-circuit"
 export { createControlBusExample } from "./control-bus-example"
 export { createDdrByte0Example } from "./ddr-byte0-example"
 export { createDdrByte1Example } from "./ddr-byte1-example"
