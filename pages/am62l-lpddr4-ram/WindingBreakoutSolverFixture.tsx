@@ -1,49 +1,16 @@
 import { GenericSolverDebugger } from "@tscircuit/solver-utils/react"
-import { useEffect, useMemo, useState } from "react"
+import { useState } from "react"
 import { WindingBreakoutSolver } from "../../lib/index"
-import type { WindingBreakoutExample } from "../../lib/types"
+import type { WindingBreakoutSolverInput } from "../../lib/types"
 
 export function WindingBreakoutSolverFixture({
-  loadExample,
+  input,
 }: {
-  readonly loadExample: () => Promise<WindingBreakoutExample>
-}): React.JSX.Element {
-  const [example, setExample] = useState<WindingBreakoutExample>()
-  const [error, setError] = useState<unknown>()
-
-  useEffect(() => {
-    let active = true
-    loadExample().then(
-      (loadedExample) => {
-        if (active) setExample(loadedExample)
-      },
-      (loadError: unknown) => {
-        if (active) setError(loadError)
-      },
-    )
-    return () => {
-      active = false
-    }
-  }, [loadExample])
-
-  if (error) {
-    return <pre>Could not render the tscircuit example: {String(error)}</pre>
-  }
-  if (!example) return <main style={{ padding: 16 }}>Rendering circuit…</main>
-
-  return <LoadedWindingBreakoutSolverFixture example={example} />
-}
-
-function LoadedWindingBreakoutSolverFixture({
-  example,
-}: {
-  readonly example: WindingBreakoutExample
+  readonly input: WindingBreakoutSolverInput
 }): React.JSX.Element {
   const [activeLayer, setActiveLayer] = useState("")
-  const solver = useMemo(() => new WindingBreakoutSolver(example), [example])
-  const signalLayers = example.stackup.filter(
-    (entry) => entry.type === "signal",
-  )
+  const [solver] = useState(() => new WindingBreakoutSolver(input))
+  const signalLayers = input.stackup.filter((entry) => entry.type === "signal")
   return (
     <main style={{ minHeight: "100vh", background: "#fff" }}>
       <select

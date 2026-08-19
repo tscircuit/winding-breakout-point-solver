@@ -13,10 +13,6 @@
     ".": {
       "import": "./lib/index.ts",
       "types": "./lib/index.ts"
-    },
-    "./examples/am62l": {
-      "import": "./examples/am62l/index.ts",
-      "types": "./examples/am62l/index.ts"
     }
   },
   "scripts": {
@@ -25,21 +21,15 @@
     "build:site": "cosmos-export",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "generate:am62l-circuit-json": "bun scripts/generate-am62l-circuit-json.ts",
-    "generate:padding-circuit-json": "bun scripts/generate-padding-circuit-json.ts",
-    "test": "bun test --timeout 60000",
+    "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@tscircuit/solver-utils": "0.0.19",
-    "circuit-json": "^0.0.469",
     "graphics-debug": "0.0.99"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.5",
-    "@tsci/0hmX.mt53e1g16d1zw-footprint": "1.0.2",
-    "@tsci/tscircuit.ti": "1.0.100",
-    "@tscircuit/core": "^0.0.1703",
     "@types/bun": "1.3.14",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
@@ -48,7 +38,6 @@
     "react-cosmos": "7.3.0",
     "react-cosmos-plugin-vite": "7.3.0",
     "react-dom": "19.2.8",
-    "tscircuit": "^0.0.2356",
     "typescript": "5.9.3",
     "vite": "8.1.5"
   }

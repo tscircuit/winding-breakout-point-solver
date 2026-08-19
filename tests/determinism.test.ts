@@ -1,9 +1,8 @@
 import { expect, test } from "bun:test"
-import { createDdrByte0Example } from "../examples/am62l"
+import { ddrByte0Example } from "../examples/am62l"
 import { cloneInput, solveSuccessfully } from "./fixtures/solver-test-utils"
 
-test("repeated cloned inputs produce byte-identical output", async () => {
-  const ddrByte0Example = await createDdrByte0Example()
+test("repeated cloned inputs produce byte-identical output", () => {
   const first = solveSuccessfully(cloneInput(ddrByte0Example))
   const second = solveSuccessfully(cloneInput(ddrByte0Example))
   const reconstructed = solveSuccessfully({
