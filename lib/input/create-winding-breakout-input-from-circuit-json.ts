@@ -34,27 +34,6 @@ export type WindingBreakoutSolverOverrides = Omit<
 export interface WindingBreakoutCircuitJsonInput {
   /** Circuit JSON emitted after tscircuit core has rendered its breakouts. */
   readonly circuitJson: readonly AnyCircuitElement[]
-  /** Select two breakout groups by their core-generated ids. */
-  readonly breakoutGroupIds?: readonly [string, string]
-  /** Select two breakout groups by their tscircuit `name` props. */
-  readonly breakoutGroupNames?: readonly [string, string]
-  /**
-   * Optional connection-name/source-trace-id filter. By default, every
-   * point-to-point trace shared by the selected breakouts is included.
-   */
-  readonly connectionIds?: readonly string[]
-  /** Defaults to the common copper layer of the linked source ports. */
-  readonly padLayer?: string
-  /** Defaults to every board copper layer except `padLayer`. */
-  readonly layerNames?: readonly string[]
-  /** Defaults to a signal-only stack inferred from `pcb_board.num_layers`. */
-  readonly stackup?: readonly StackupEntry[]
-  /** Defaults to the same board-DRC formula used by core's breakout input. */
-  readonly boundaryPointSpacing?: number
-  /** Defaults to half of `boundaryPointSpacing`. */
-  readonly breakoutStaggerOffset?: number
-  /** Defaults to true and recognizes `NAME`/`NAME_n` source-trace names. */
-  readonly inferDifferentialPairs?: boolean
   /** Bus bands, layer hints, and other expert-only solver controls. */
   readonly solverOverrides?: WindingBreakoutSolverOverrides
 }
@@ -205,52 +184,16 @@ const getGroupPairKey = (firstId: string, secondId: string): string =>
 const getGroupLabel = (group: PcbGroup): string =>
   group.name ?? group.pcb_group_id
 
-const resolveSelectedGroups = ({
-  input,
+const resolveLinkedGroups = ({
   pcbGroups,
   linkedPairs,
 }: {
-  input: WindingBreakoutCircuitJsonInput
   pcbGroups: readonly PcbGroup[]
   linkedPairs: readonly LinkedBreakoutPointPair[]
 }): readonly [PcbGroup, PcbGroup] => {
-  if (input.breakoutGroupIds && input.breakoutGroupNames) {
-    fail("provide breakoutGroupIds or breakoutGroupNames, not both")
-  }
   const groupById = new Map(
     pcbGroups.map((group) => [group.pcb_group_id, group]),
   )
-
-  if (input.breakoutGroupIds) {
-    const missingGroupMessage = `could not find breakoutGroupIds ${input.breakoutGroupIds
-      .map((id) => `"${id}"`)
-      .join(" and ")}`
-    const first =
-      groupById.get(input.breakoutGroupIds[0]) ?? fail(missingGroupMessage)
-    const second =
-      groupById.get(input.breakoutGroupIds[1]) ?? fail(missingGroupMessage)
-    if (first.pcb_group_id === second.pcb_group_id) {
-      fail("the selected breakout groups must be distinct")
-    }
-    return [first, second]
-  }
-
-  if (input.breakoutGroupNames) {
-    const groups = input.breakoutGroupNames.map((name) => {
-      const matches = pcbGroups.filter((group) => group.name === name)
-      if (matches.length !== 1) {
-        fail(
-          `breakout group name "${name}" must resolve exactly once; found ${matches.length}`,
-        )
-      }
-      return matches[0]!
-    })
-    if (groups[0]!.pcb_group_id === groups[1]!.pcb_group_id) {
-      fail("the selected breakout groups must be distinct")
-    }
-    return groups as [PcbGroup, PcbGroup]
-  }
-
   const pairsByGroupPair = new Map<string, LinkedBreakoutPointPair[]>()
   for (const pair of linkedPairs) {
     const key = getGroupPairKey(
@@ -274,7 +217,7 @@ const resolveSelectedGroups = ({
       })
       .join(", ")
     fail(
-      `multiple linked breakout group pairs were found; select one with breakoutGroupNames or breakoutGroupIds: ${candidates}`,
+      `Circuit JSON must contain exactly one linked breakout group pair; found: ${candidates}`,
     )
   }
 
@@ -415,8 +358,7 @@ export const createWindingBreakoutInputFromCircuitJson = (
 ): WindingBreakoutSolverInput => {
   const pcbGroups = getElements(input.circuitJson, "pcb_group") as PcbGroup[]
   const linkedPairs = detectLinkedBreakoutPointPairs(input.circuitJson)
-  const selectedGroups = resolveSelectedGroups({
-    input,
+  const selectedGroups = resolveLinkedGroups({
     pcbGroups,
     linkedPairs,
   })
@@ -432,27 +374,13 @@ export const createWindingBreakoutInputFromCircuitJson = (
     selectedGroups[0].pcb_group_id,
     selectedGroups[1].pcb_group_id,
   )
-  let selectedPairs = linkedPairs.filter(
+  const selectedPairs = linkedPairs.filter(
     (pair) =>
       getGroupPairKey(pair.points[0].pcbGroupId, pair.points[1].pcbGroupId) ===
       selectedPairKey,
   )
-  if (input.connectionIds) {
-    const requested = new Set(input.connectionIds)
-    selectedPairs = selectedPairs.filter(
-      (pair) =>
-        requested.has(pair.connectionId) || requested.has(pair.sourceTraceId),
-    )
-    const detectedIds = new Set(
-      selectedPairs.flatMap((pair) => [pair.connectionId, pair.sourceTraceId]),
-    )
-    const missing = input.connectionIds.filter((id) => !detectedIds.has(id))
-    if (missing.length > 0) {
-      fail(`requested connections were not linked: ${missing.join(", ")}`)
-    }
-  }
   if (selectedPairs.length === 0) {
-    fail("the selected breakout groups contain no linked point pairs")
+    fail("the linked breakout groups contain no point pairs")
   }
   const connectionIds = selectedPairs.map((pair) => pair.connectionId)
   if (new Set(connectionIds).size !== connectionIds.length) {
@@ -463,17 +391,13 @@ export const createWindingBreakoutInputFromCircuitJson = (
 
   const boards = getElements(input.circuitJson, "pcb_board") as PcbBoard[]
   const board = findBoard(boards, selectedGroups)
-  const padLayer = input.padLayer ?? inferPadLayer(selectedPairs)
-  const inferredStackup = getBoardLayers(board?.num_layers ?? 2).map(
+  const padLayer = inferPadLayer(selectedPairs)
+  const stackup = getBoardLayers(board?.num_layers ?? 2).map(
     (id): StackupEntry => ({ id, type: "signal" }),
   )
-  const stackup = [...(input.stackup ?? inferredStackup)]
-  const layerNames = [
-    ...(input.layerNames ??
-      stackup
-        .filter((entry) => entry.type === "signal" && entry.id !== padLayer)
-        .map((entry) => entry.id)),
-  ]
+  const layerNames = stackup
+    .filter((entry) => entry.id !== padLayer)
+    .map((entry) => entry.id)
   if (layerNames.length === 0) {
     fail("at least one routing layer other than padLayer is required")
   }
@@ -523,8 +447,7 @@ export const createWindingBreakoutInputFromCircuitJson = (
     },
   )
 
-  const boundaryPointSpacing =
-    input.boundaryPointSpacing ?? getBoundaryPointSpacing(board)
+  const boundaryPointSpacing = getBoundaryPointSpacing(board)
   const inferredPairs = inferDifferentialPairs(connectionIds)
   const solverOverrides = input.solverOverrides ?? {}
 
@@ -535,11 +458,8 @@ export const createWindingBreakoutInputFromCircuitJson = (
     layerNames,
     stackup,
     boundaryPointSpacing,
-    breakoutStaggerOffset:
-      input.breakoutStaggerOffset ?? boundaryPointSpacing / 2,
-    differentialPairs:
-      solverOverrides.differentialPairs ??
-      (input.inferDifferentialPairs === false ? [] : inferredPairs),
+    breakoutStaggerOffset: boundaryPointSpacing / 2,
+    differentialPairs: solverOverrides.differentialPairs ?? inferredPairs,
     busLocalOptimization: solverOverrides.busLocalOptimization ?? false,
   }
 }

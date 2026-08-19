@@ -2,7 +2,6 @@ import type { AnyCircuitElement } from "circuit-json"
 import { createWindingBreakoutInputFromCircuitJson } from "../../lib/input/create-winding-breakout-input-from-circuit-json"
 import type {
   BreakoutBand,
-  StackupEntry,
   WindingBreakoutExample,
   WindingBreakoutExampleMetadata,
 } from "../../lib/types"
@@ -17,31 +16,58 @@ interface ExampleOptions extends WindingBreakoutExampleMetadata {
   readonly buses: readonly DdrBusName[]
 }
 
-const AM62L_STACKUP: readonly StackupEntry[] = [
-  { id: "top", type: "signal" },
-  { id: "gnd_top", type: "plane", solid: true, net: "GND" },
-  { id: "inner1", type: "signal" },
-  { id: "inner2", type: "signal" },
-  { id: "gnd_mid_1", type: "plane", solid: true, net: "GND" },
-  { id: "inner3", type: "signal" },
-  { id: "inner4", type: "signal" },
-  { id: "gnd_mid_2", type: "plane", solid: true, net: "GND" },
-  { id: "inner5", type: "signal" },
-  { id: "inner6", type: "signal" },
-  { id: "gnd_bottom", type: "plane", solid: true, net: "GND" },
-  { id: "bottom", type: "signal" },
-]
-
 const BUS_BANDS: Readonly<Record<DdrBusName, BreakoutBand>> = {
-  DDR_BYTE1: { min: 1.75, max: 4.25, position: "upper" },
-  DDR_ADDR_CTRL: { min: -1.25, max: 1.25, position: "center" },
-  DDR_BYTE0: { min: -4.25, max: -1.75, position: "lower" },
+  DDR_BYTE1: { min: 1.25, max: 4.75, position: "upper" },
+  DDR_ADDR_CTRL: { min: -1.75, max: 1.75, position: "center" },
+  DDR_BYTE0: { min: -4.75, max: -1.25, position: "lower" },
 }
 
 /** Compact snapshot produced from the canonical core circuit at development time. */
 export const getAm62lCircuitJson = async (): Promise<
   readonly AnyCircuitElement[]
 > => AM62L_CIRCUIT_JSON
+
+const selectConnections = (
+  circuitJson: readonly AnyCircuitElement[],
+  connectionIds: readonly string[],
+): AnyCircuitElement[] => {
+  const requestedConnections = new Set(connectionIds)
+  const sourceTraceIds = new Set(
+    circuitJson.flatMap((element) =>
+      element.type === "source_trace" &&
+      element.name &&
+      requestedConnections.has(element.name)
+        ? [element.source_trace_id]
+        : [],
+    ),
+  )
+  const sourcePortIds = new Set(
+    circuitJson.flatMap((element) =>
+      element.type === "pcb_breakout_point" &&
+      element.source_trace_id &&
+      sourceTraceIds.has(element.source_trace_id) &&
+      element.source_port_id
+        ? [element.source_port_id]
+        : [],
+    ),
+  )
+
+  return circuitJson.filter((element) => {
+    if (element.type === "source_trace") {
+      return sourceTraceIds.has(element.source_trace_id)
+    }
+    if (element.type === "pcb_breakout_point") {
+      return (
+        element.source_trace_id !== undefined &&
+        sourceTraceIds.has(element.source_trace_id)
+      )
+    }
+    if (element.type === "pcb_port") {
+      return sourcePortIds.has(element.source_port_id)
+    }
+    return true
+  })
+}
 
 export const createAm62lExample = async (
   options: ExampleOptions,
@@ -57,10 +83,7 @@ export const createAm62lExample = async (
   )
 
   const input = createWindingBreakoutInputFromCircuitJson({
-    circuitJson: await getAm62lCircuitJson(),
-    breakoutGroupNames: ["SOC_BREAKOUT", "RAM_BREAKOUT"],
-    connectionIds,
-    stackup: AM62L_STACKUP,
+    circuitJson: selectConnections(await getAm62lCircuitJson(), connectionIds),
     solverOverrides: {
       busLocalOptimization: true,
       busByConnection: Object.fromEntries(

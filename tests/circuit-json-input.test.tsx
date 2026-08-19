@@ -165,7 +165,6 @@ test("builds and solves winding input directly from a core circuit", () => {
   const circuitJson = getLinkedBreakoutCircuitJson()
   const input = createWindingBreakoutInputFromCircuitJson({
     circuitJson,
-    breakoutGroupNames: ["SOC_BREAKOUT", "RAM_BREAKOUT"],
   })
 
   expect(input.regions).toHaveLength(2)
@@ -190,7 +189,6 @@ test("builds and solves winding input directly from a core circuit", () => {
 
   const solver = WindingBreakoutSolver.fromCircuitJson({
     circuitJson,
-    breakoutGroupNames: ["SOC_BREAKOUT", "RAM_BREAKOUT"],
   })
   solver.solve()
 
@@ -198,17 +196,24 @@ test("builds and solves winding input directly from a core circuit", () => {
   expect(solver.getOutput().breakoutPoints).toHaveLength(8)
 })
 
-test("filters automatically linked pairs by trace name", () => {
+test("keeps non-Circuit-JSON controls isolated in solverOverrides", () => {
   const circuitJson = getLinkedBreakoutCircuitJson()
   const input = createWindingBreakoutInputFromCircuitJson({
     circuitJson,
-    connectionIds: ["CLK", "CLK_n"],
+    solverOverrides: {
+      maxSearchNodes: 123,
+      preserveWinding: false,
+    },
   })
 
   expect(input.regions[0]!.ports.map((port) => port.connectionId)).toEqual([
     "CLK",
     "CLK_n",
+    "D0",
+    "D1",
   ])
+  expect(input.maxSearchNodes).toBe(123)
+  expect(input.preserveWinding).toBe(false)
   expect(input.differentialPairs).toEqual([
     { positive: "CLK", negative: "CLK_n" },
   ])

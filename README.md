@@ -38,7 +38,6 @@ await circuit.renderUntilSettled()
 
 const solver = WindingBreakoutSolver.fromCircuitJson({
   circuitJson: circuit.getCircuitJson(),
-  breakoutGroupNames: ["SOC_BREAKOUT", "RAM_BREAKOUT"],
 })
 solver.solve()
 const output = solver.getOutput()
@@ -49,11 +48,9 @@ layer, routing layers, and breakout spacing from Circuit JSON. A named source
 trace becomes the public connection id; unnamed traces use their
 `source_trace_id`. `NAME`/`NAME_n` traces are recognized as differential pairs.
 
-When the circuit contains only one linked pair of breakout groups,
-`breakoutGroupNames` can be omitted. Use `connectionIds` to select a subset of
-the automatically linked traces. Explicit stackups, bus bands, layer hints,
-and other advanced controls remain available through `stackup`, `layerNames`,
-and `solverOverrides`.
+The adapter expects one reciprocal pair of breakout groups and includes every
+linked trace between them. Bus bands, layer hints, and other controls that are
+not represented by Circuit JSON remain isolated under `solverOverrides`.
 
 `detectLinkedBreakoutPointPairs(circuitJson)` exposes the detected links for
 debugging. A link is intentionally point-to-point: exactly two breakout points
