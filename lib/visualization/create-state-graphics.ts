@@ -35,9 +35,8 @@ export const createStateGraphics = (
         (candidate) => candidate.regionId === region.id,
       )
       if (!endpoint || !breakout) return []
-      return regionIndex === 0
-        ? [endpoint.position, breakout]
-        : [breakout, endpoint.position]
+      if (regionIndex === 0) return [endpoint.position, breakout]
+      return [breakout, endpoint.position]
     })
     if (points.length < 4) return []
     return [

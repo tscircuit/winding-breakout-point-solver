@@ -13,9 +13,10 @@ export const createWindingBreakoutVisualization = (
   activeLayer?: string,
 ): GraphicsObject => {
   const inputGraphics = createInputGraphics(input, activeLayer)
-  const stateGraphics = state
-    ? createStateGraphics(input, state, activeLayer)
-    : {}
+  let stateGraphics: GraphicsObject = {}
+  if (state) {
+    stateGraphics = createStateGraphics(input, state, activeLayer)
+  }
   return {
     title: "Winding breakout solver",
     coordinateSystem: "cartesian",

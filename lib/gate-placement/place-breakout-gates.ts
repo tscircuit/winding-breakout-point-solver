@@ -19,6 +19,24 @@ export interface GatePlacementResult {
 const isVerticalEdge = (edge: ValidatedRegion["edge"]): boolean =>
   edge === "left" || edge === "right"
 
+const getAxisMinimum = (region: ValidatedRegion, vertical: boolean): number => {
+  if (vertical) return region.bounds.minY
+  return region.bounds.minX
+}
+
+const getAxisMaximum = (region: ValidatedRegion, vertical: boolean): number => {
+  if (vertical) return region.bounds.maxY
+  return region.bounds.maxX
+}
+
+const getAxisPosition = (
+  position: { readonly x: number; readonly y: number },
+  vertical: boolean,
+): number => {
+  if (vertical) return position.y
+  return position.x
+}
+
 const deriveLayerOffsets = (
   layerNames: readonly string[],
   boundaryPointSpacing: number,
@@ -81,14 +99,10 @@ const makeGateAxes = ({
 }): { vertical: boolean; axes: number[] } => {
   const vertical = regions.every((region) => isVerticalEdge(region.edge))
   const minAxis = Math.max(
-    ...regions.map((region) =>
-      vertical ? region.bounds.minY : region.bounds.minX,
-    ),
+    ...regions.map((region) => getAxisMinimum(region, vertical)),
   )
   const maxAxis = Math.min(
-    ...regions.map((region) =>
-      vertical ? region.bounds.maxY : region.bounds.maxX,
-    ),
+    ...regions.map((region) => getAxisMaximum(region, vertical)),
   )
   const minimumOffset = Math.min(...Object.values(layerOffsets))
   const maximumOffset = Math.max(...Object.values(layerOffsets))
@@ -109,7 +123,7 @@ const makeGateAxes = ({
       return (
         regionSum +
         positions.reduce(
-          (sum, position) => sum + (vertical ? position.y : position.x),
+          (sum, position) => sum + getAxisPosition(position, vertical),
           0,
         ) /
           positions.length
@@ -134,14 +148,18 @@ const pointOnEdge = (
   vertical: boolean,
 ) => {
   if (vertical) {
+    let x = region.bounds.maxX
+    if (region.edge === "left") x = region.bounds.minX
     return {
-      x: region.edge === "left" ? region.bounds.minX : region.bounds.maxX,
+      x,
       y: axis,
     }
   }
+  let y = region.bounds.maxY
+  if (region.edge === "bottom") y = region.bounds.minY
   return {
     x: axis,
-    y: region.edge === "bottom" ? region.bounds.minY : region.bounds.maxY,
+    y,
   }
 }
 

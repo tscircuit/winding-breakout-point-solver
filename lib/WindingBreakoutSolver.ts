@@ -54,7 +54,8 @@ export class WindingBreakoutSolver extends BaseSolver {
   }
 
   computeProgress(): number {
-    return this.solved ? 1 : 0
+    if (this.solved) return 1
+    return 0
   }
 
   override getConstructorParams(): [WindingBreakoutSolverInput] {

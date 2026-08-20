@@ -126,9 +126,10 @@ test("invalid differential pairs fail validation", () => {
   expectInputError(
     {
       ...input,
-      connections: input.connections.map((connection, index) =>
-        index === pairIndex ? invalidPair : connection,
-      ),
+      connections: input.connections.map((connection, index) => {
+        if (index === pairIndex) return invalidPair
+        return connection
+      }),
     },
     `connections[${pairIndex}].connections must contain exactly two members`,
   )

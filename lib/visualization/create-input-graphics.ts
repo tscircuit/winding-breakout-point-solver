@@ -18,10 +18,9 @@ export const createInputGraphics = (
     texts: [],
   }
   const layerNames = getLayerNames(input)
-  const visibleLayers = getGraphicsLayer(
-    input,
-    activeLayer ? [activeLayer] : layerNames,
-  )
+  let displayedLayers = layerNames
+  if (activeLayer) displayedLayers = [activeLayer]
+  const visibleLayers = getGraphicsLayer(input, displayedLayers)
   const connections = getCanonicalConnections(input)
   const endpointRadius = Math.min(0.12, input.boundaryPointSpacing / 4)
 

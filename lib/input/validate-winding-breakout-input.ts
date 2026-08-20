@@ -61,6 +61,11 @@ const requirePositive = (value: unknown, label: string): void => {
   if (value <= 0) fail(`${label} must be positive`)
 }
 
+const requireArray = (value: unknown, message: string): unknown[] => {
+  if (Array.isArray(value)) return value
+  return fail(message)
+}
+
 const validatePoint = (value: unknown, label: string): Point => {
   requireRecord(value, label)
   requireFinite(value.x, `${label}.x`)
@@ -163,9 +168,10 @@ export const validateWindingBreakoutInput = (
       layer = inheritedLayer
     }
 
-    const endpointValues = Array.isArray(value.endpoints)
-      ? value.endpoints
-      : fail(`${label}.endpoints must be an array`)
+    const endpointValues = requireArray(
+      value.endpoints,
+      `${label}.endpoints must be an array`,
+    )
     const endpointRegionIds = new Set<string>()
     const endpoints: ConnectionEndpoint[] = endpointValues.map(
       (endpointValue, endpointIndex) => {
@@ -220,9 +226,10 @@ export const validateWindingBreakoutInput = (
         fail(`${label} has invalid differential-pair type`)
       }
       requireId(value.layer, `${label}.layer`)
-      const pairConnections = Array.isArray(value.connections)
-        ? value.connections
-        : fail(`${label}.connections must contain exactly two members`)
+      const pairConnections = requireArray(
+        value.connections,
+        `${label}.connections must contain exactly two members`,
+      )
       if (pairConnections.length !== 2) {
         fail(`${label}.connections must contain exactly two members`)
       }

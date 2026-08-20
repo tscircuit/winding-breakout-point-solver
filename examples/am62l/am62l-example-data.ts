@@ -253,8 +253,11 @@ export const createAm62lExample = (
   options: ExampleOptions,
 ): WindingBreakoutSolverInput => {
   const addedPairIds = new Set<string>()
-  const getLayer = (port: PortPair) =>
-    options.useFullLayers ? (port.fullLayer ?? port.layer) : port.layer
+  const getLayer = (port: PortPair): string => {
+    if (!options.useFullLayers) return port.layer
+    if (port.fullLayer !== undefined) return port.fullLayer
+    return port.layer
+  }
   const makeEndpoints = (port: PortPair) => [
     { regionId: "soc", position: port.soc },
     { regionId: "ram", position: port.ram },
