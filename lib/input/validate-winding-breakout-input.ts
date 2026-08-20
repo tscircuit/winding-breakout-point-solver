@@ -99,8 +99,8 @@ const pointIsInsideBounds = (point: Point, bounds: Bounds): boolean =>
 export const validateWindingBreakoutInput = (
   input: WindingBreakoutSolverInput,
 ): ValidatedWindingInput => {
-  if (!Array.isArray(input.regions) || input.regions.length < 2) {
-    fail("at least two regions are required")
+  if (!Array.isArray(input.regions) || input.regions.length === 0) {
+    fail("at least one region is required")
   }
   requirePositive(input.boundaryPointSpacing, "boundaryPointSpacing")
 

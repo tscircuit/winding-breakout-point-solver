@@ -1,7 +1,7 @@
 # @tscircuit/winding-breakout-point-solver
 
-A typed, deterministic solver for placing winding-aware breakout points on
-facing region boundaries. The caller declares every connection once, including
+A typed, deterministic solver for placing winding-aware breakout points on one
+or more declared region boundaries. The caller declares every connection once, including
 its layer and one endpoint per region. The solver derives winding order and
 staggered boundary points; it does not generate traces, dogbones, or vias.
 
@@ -42,7 +42,8 @@ type DifferentialPairInput = {
 }
 ```
 
-Every connection must have exactly one endpoint for every declared region.
+At least one region is required. Every connection must have exactly one endpoint
+for every declared region.
 Differential-pair members inherit the pair's layer and remain adjacent in the
 breakout order.
 
@@ -113,8 +114,11 @@ The solver derives each region center from its bounds, uses the first region's
 endpoint geometry as the reference winding, and derives its layer stagger as
 `boundaryPointSpacing / 2`. It never changes a declared connection layer.
 
-`getOutput()` is unavailable until the solver completes successfully. Call
-`step()` to inspect incremental solver state or `solve()` to run to completion.
+`getOutput()` is unavailable until the solver completes successfully. Input
+validation runs during solver setup. The `BasePipelineSolver` then runs three
+internal solvers: reference ordering, boundary-gate placement, and output
+validation. Call `step()` to inspect them incrementally or `solve()` to run to
+completion.
 
 The package exports the solver, input and output types, error classes, and the
 AM62L/LPDDR4 byte-lane, control, and full-link examples.
@@ -132,7 +136,12 @@ git diff --check
 
 The React Cosmos debugger renders region bounds, canonical endpoints, and
 calculated breakout points. Its layer selector is derived from the connection
-records.
+records. Start it with `bun run start`, then open **Region Count Breakdown** for
+interactive one-, two-, and three-region examples. Each example exposes the
+three solver stages independently in the pipeline debugger. The one-region
+example also renders caller-owned destination points outside the region, making
+the full endpoint-to-breakout-to-destination continuation visible without
+turning those destinations into fake regions or breakout points.
 
 ## Deployment
 

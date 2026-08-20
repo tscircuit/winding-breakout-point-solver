@@ -14,6 +14,7 @@ import {
 } from "../lib"
 import { getCanonicalConnections } from "../lib/input/get-canonical-connections"
 import { cloneInput, solveSuccessfully } from "./fixtures/solver-test-utils"
+import { oneRegionExample } from "../examples/region-count"
 
 const withFirstConnection = (
   update: (connection: ConnectionInput) => ConnectionInput,
@@ -34,6 +35,16 @@ const expectInputError = (
   expect(() => solver.setup()).toThrow(WindingBreakoutInputError)
   expect(() => solver.setup()).toThrow(message)
 }
+
+test("zero regions fail validation", () => {
+  expectInputError(
+    {
+      ...cloneInput(oneRegionExample),
+      regions: [],
+    },
+    "at least one region is required",
+  )
+})
 
 test("layers are never reassigned", () => {
   const input = cloneInput(ddrByte0Example)

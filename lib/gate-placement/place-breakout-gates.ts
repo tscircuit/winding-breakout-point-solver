@@ -109,7 +109,7 @@ const makeGateAxes = ({
   const span = spacing * Math.max(0, count - 1) + maximumOffset - minimumOffset
   if (maxAxis - minAxis + GEOMETRY_EPSILON < span) {
     throw new WindingBreakoutInfeasibleError(
-      `WindingBreakoutSolver: shared facing edges need ${span.toFixed(2)}mm but expose only ${(maxAxis - minAxis).toFixed(2)}mm`,
+      `WindingBreakoutSolver: declared breakout edges need ${span.toFixed(2)}mm but expose only ${(maxAxis - minAxis).toFixed(2)}mm`,
     )
   }
   const meanAxis =
