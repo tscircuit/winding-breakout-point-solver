@@ -51,39 +51,8 @@ export interface WindingBreakoutSolverInput {
 export interface BreakoutPoint extends Point {
   readonly regionId: string
   readonly connectionId: string
-  readonly layer: string
-  readonly slotIndex: number
-  readonly layerOffset: number
-}
-
-export interface SharedGateIndicator {
-  readonly connectionId: string
-  readonly layer: string
-}
-
-export interface SharedGateSlot extends Point {
-  readonly id: string
-  readonly regionId: string
-  readonly indicators: readonly SharedGateIndicator[]
-}
-
-export interface BreakoutPointValidationResult {
-  readonly valid: boolean
-  readonly missingEndpoints: readonly string[]
-  readonly duplicateEndpoints: readonly string[]
-  readonly layerInconsistencies: readonly string[]
-  readonly atomicGroupViolations: readonly string[]
 }
 
 export interface WindingBreakoutOutput {
-  readonly solved: true
-  readonly referenceOrder: readonly string[]
-  readonly naturalOrderByRegion: Readonly<Record<string, readonly string[]>>
-  readonly gateOrderByLayerByRegion: Readonly<
-    Record<string, Readonly<Record<string, readonly string[]>>>
-  >
-  readonly layerOffsets: Readonly<Record<string, number>>
   readonly breakoutPoints: readonly BreakoutPoint[]
-  readonly sharedGateSlots: readonly SharedGateSlot[]
-  readonly validation: BreakoutPointValidationResult
 }

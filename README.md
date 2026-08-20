@@ -47,6 +47,42 @@ for every declared region.
 Differential-pair members inherit the pair's layer and remain adjacent in the
 breakout order.
 
+Every input field carries caller-owned information:
+
+- region IDs and connection IDs are stable join keys;
+- bounds and the selected edge define the allowed breakout geometry;
+- endpoint region IDs make the join explicit instead of coupling two arrays by
+  position;
+- endpoint positions define the winding, while connection layers and
+  differential-pair membership are routing constraints; and
+- `boundaryPointSpacing` is the requested physical spacing.
+
+Region centers, the layer list, winding orders, and layer stagger offsets are
+derived by the solver and are not accepted as input.
+
+## Output API
+
+The successful result contains only the calculated coordinates and the two
+join keys needed to associate each point with the input:
+
+```ts
+type WindingBreakoutOutput = {
+  breakoutPoints: readonly {
+    regionId: string
+    connectionId: string
+    x: number
+    y: number
+  }[]
+}
+```
+
+Layers remain owned by `connections` and are not copied onto every point.
+Successful `getOutput()` already proves that the solver completed and its
+invariants passed, so the result does not repeat a `solved` flag or validation
+report. Reference/natural orders, slot indexes, layer offsets, layer/region
+order tables, and shared-slot groups are deterministic intermediate values and
+are likewise omitted.
+
 ## Usage
 
 ```ts
@@ -115,10 +151,10 @@ endpoint geometry as the reference winding, and derives its layer stagger as
 `boundaryPointSpacing / 2`. It never changes a declared connection layer.
 
 `getOutput()` is unavailable until the solver completes successfully. Input
-validation runs during solver setup. The `BasePipelineSolver` then runs three
-internal solvers: reference ordering, boundary-gate placement, and output
-validation. Call `step()` to inspect them incrementally or `solve()` to run to
-completion.
+validation runs during solver setup. The `BasePipelineSolver` then runs two
+internal solvers: reference ordering and boundary-gate placement. Output
+validation runs before the minimal result is exposed. Call `step()` to inspect
+the stages incrementally or `solve()` to run to completion.
 
 The package exports the solver, input and output types, error classes, and the
 AM62L/LPDDR4 byte-lane, control, and full-link examples.
@@ -138,7 +174,7 @@ The React Cosmos debugger renders region bounds, canonical endpoints, and
 calculated breakout points. Its layer selector is derived from the connection
 records. Start it with `bun run start`, then open **Region Count Breakdown** for
 interactive one-, two-, and three-region examples. Each example exposes the
-three solver stages independently in the pipeline debugger. The one-region
+two pipeline stages independently in the pipeline debugger. The one-region
 example also renders caller-owned destination points outside the region, making
 the full endpoint-to-breakout-to-destination continuation visible without
 turning those destinations into fake regions or breakout points.

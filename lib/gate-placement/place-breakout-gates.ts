@@ -3,17 +3,12 @@ import type {
   ValidatedConnection,
   ValidatedRegion,
 } from "../input/validate-winding-breakout-input"
-import type { BreakoutPoint, SharedGateSlot } from "../types"
+import type { BreakoutPoint } from "../types"
 
 const GEOMETRY_EPSILON = 1e-9
 
 export interface GatePlacementResult {
-  readonly gateOrderByLayerByRegion: Readonly<
-    Record<string, Readonly<Record<string, readonly string[]>>>
-  >
-  readonly layerOffsets: Readonly<Record<string, number>>
   readonly breakoutPoints: readonly BreakoutPoint[]
-  readonly sharedGateSlots: readonly SharedGateSlot[]
 }
 
 const isVerticalEdge = (edge: ValidatedRegion["edge"]): boolean =>
@@ -163,37 +158,6 @@ const pointOnEdge = (
   }
 }
 
-const groupSharedGateSlots = (
-  points: readonly BreakoutPoint[],
-): SharedGateSlot[] => {
-  const groups = new Map<
-    string,
-    {
-      id: string
-      regionId: string
-      x: number
-      y: number
-      indicators: Array<{ connectionId: string; layer: string }>
-    }
-  >()
-  for (const point of points) {
-    const key = `${point.regionId}:${point.x.toFixed(9)}:${point.y.toFixed(9)}`
-    const group = groups.get(key) ?? {
-      id: key,
-      regionId: point.regionId,
-      x: point.x,
-      y: point.y,
-      indicators: [],
-    }
-    group.indicators.push({
-      connectionId: point.connectionId,
-      layer: point.layer,
-    })
-    groups.set(key, group)
-  }
-  return [...groups.values()]
-}
-
 export const placeBreakoutGates = ({
   regions,
   connections,
@@ -213,20 +177,15 @@ export const placeBreakoutGates = ({
     connections.map((connection) => [connection.id, connection.layer]),
   )
   const layerOffsets = deriveLayerOffsets(layerNames, boundaryPointSpacing)
-  const gateOrderByLayerByRegion = Object.fromEntries(
-    regions.map((region) => [
-      region.id,
-      Object.fromEntries(
-        layerNames.map((layer) => [
-          layer,
-          makeAtomicLayerOrder({
-            referenceOrder,
-            layer,
-            layerByConnection,
-            atomicGroups,
-          }),
-        ]),
-      ),
+  const gateOrderByLayer = Object.fromEntries(
+    layerNames.map((layer) => [
+      layer,
+      makeAtomicLayerOrder({
+        referenceOrder,
+        layer,
+        layerByConnection,
+        atomicGroups,
+      }),
     ]),
   )
   const maxLayerNetCount = Math.max(
@@ -244,26 +203,16 @@ export const placeBreakoutGates = ({
   })
   const breakoutPoints = regions.flatMap((region) =>
     layerNames.flatMap((layer) =>
-      gateOrderByLayerByRegion[region.id]![layer]!.map(
-        (connectionId, slotIndex) => ({
-          regionId: region.id,
-          connectionId,
-          layer,
-          ...pointOnEdge(
-            region,
-            axes[slotIndex]! + layerOffsets[layer]!,
-            vertical,
-          ),
-          slotIndex,
-          layerOffset: layerOffsets[layer]!,
-        }),
-      ),
+      gateOrderByLayer[layer]!.map((connectionId, slotIndex) => ({
+        regionId: region.id,
+        connectionId,
+        ...pointOnEdge(
+          region,
+          axes[slotIndex]! + layerOffsets[layer]!,
+          vertical,
+        ),
+      })),
     ),
   )
-  return {
-    gateOrderByLayerByRegion,
-    layerOffsets,
-    breakoutPoints,
-    sharedGateSlots: groupSharedGateSlots(breakoutPoints),
-  }
+  return { breakoutPoints }
 }

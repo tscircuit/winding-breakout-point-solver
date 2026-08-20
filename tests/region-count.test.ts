@@ -49,7 +49,6 @@ for (const [label, example] of examples) {
       ]),
     )
 
-    expect(output.validation.valid).toBe(true)
     expect(output.breakoutPoints).toHaveLength(
       canonicalConnections.length * input.regions.length,
     )
@@ -61,7 +60,6 @@ for (const [label, example] of examples) {
             point.connectionId === connection.id,
         )
         expect(points).toHaveLength(1)
-        expect(points[0]!.layer).toBe(layerByConnection.get(connection.id)!)
         expectPointOnDeclaredEdge(points[0]!, region)
       }
     }
@@ -71,20 +69,19 @@ for (const [label, example] of examples) {
       const pair = entry as DifferentialPairInput
       const pairIds = pair.connections.map((connection) => connection.id)
       for (const region of input.regions) {
-        const order = output.gateOrderByLayerByRegion[region.id]![pair.layer]!
+        const vertical = region.edge === "left" || region.edge === "right"
+        const order = output.breakoutPoints
+          .filter(
+            (point) =>
+              point.regionId === region.id &&
+              layerByConnection.get(point.connectionId) === pair.layer,
+          )
+          .sort((first, second) =>
+            vertical ? first.y - second.y : first.x - second.x,
+          )
+          .map((point) => point.connectionId)
         expect(
           Math.abs(order.indexOf(pairIds[0]!) - order.indexOf(pairIds[1]!)),
-        ).toBe(1)
-        const pairPoints = output.breakoutPoints.filter(
-          (point) =>
-            point.regionId === region.id &&
-            pairIds.includes(point.connectionId),
-        )
-        expect(pairPoints.every((point) => point.layer === pair.layer)).toBe(
-          true,
-        )
-        expect(
-          Math.abs(pairPoints[0]!.slotIndex - pairPoints[1]!.slotIndex),
         ).toBe(1)
       }
     }
@@ -108,7 +105,7 @@ test("one-region solve validates around the normal two-stage pipeline", () => {
     "gatePlacement",
   ])
   expect(solver.stats.phase).toBe("finalize-output-validation")
-  expect(solver.getOutput().validation.valid).toBe(true)
+  expect(solver.stats.valid).toBe(true)
   const graphics = solver.visualize()
   const phaseLabels = (graphics.texts ?? [])
     .map((text) => text.text)
@@ -126,12 +123,16 @@ test("one-region solve validates around the normal two-stage pipeline", () => {
 })
 
 test("the first region geometry remains the reference for every region count", () => {
-  const outputs = examples.map(([, input]) =>
-    solveSuccessfully(cloneInput(input)),
-  )
-  expect(outputs[1]!.referenceOrder).toEqual(outputs[0]!.referenceOrder)
-  expect(outputs[2]!.referenceOrder).toEqual(outputs[0]!.referenceOrder)
-  expect(outputs[0]!.referenceOrder).not.toEqual(
+  const referenceOrders = examples.map(([, example]) => {
+    const solver = new WindingBreakoutSolver(cloneInput(example))
+    solver.solve()
+    return solver
+      .getSolver<ReferenceOrderingSolver>("referenceOrdering")!
+      .getOutput().referenceOrder
+  })
+  expect(referenceOrders[1]).toEqual(referenceOrders[0])
+  expect(referenceOrders[2]).toEqual(referenceOrders[0])
+  expect(referenceOrders[0]).not.toEqual(
     getCanonicalConnections(oneRegionExample).map(
       (connection) => connection.id,
     ),

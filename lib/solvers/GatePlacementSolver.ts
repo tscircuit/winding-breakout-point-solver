@@ -12,6 +12,14 @@ import type { WindingBreakoutVisualizationState } from "../visualization/create-
 import { getGraphicsLayer } from "../visualization/get-graphics-layer"
 import type { ReferenceOrderingResult } from "./ReferenceOrderingSolver"
 
+const getSharedGateSlotCount = (points: readonly BreakoutPoint[]): number =>
+  new Set(
+    points.map(
+      (point) =>
+        `${point.regionId}:${point.x.toFixed(9)}:${point.y.toFixed(9)}`,
+    ),
+  ).size
+
 export interface GatePlacementSolverParams {
   readonly input: WindingBreakoutSolverInput
   readonly validated: ValidatedWindingInput
@@ -28,11 +36,18 @@ export class GatePlacementSolver extends BaseSolver {
     readonly layer: string
   }>
   private readonly visibleBreakoutPoints: BreakoutPoint[] = []
+  private readonly layerByConnection: Readonly<Record<string, string>>
   private visualizationLayer?: string
 
   constructor(private readonly params: GatePlacementSolverParams) {
     super()
     this.visualizationLayer = params.visualizationLayer
+    this.layerByConnection = Object.fromEntries(
+      params.validated.connections.map((connection) => [
+        connection.id,
+        connection.layer,
+      ]),
+    )
     this.placementBatches = params.validated.regions.flatMap((region) =>
       params.validated.layerNames.map((layer) => ({
         regionId: region.id,
@@ -58,7 +73,6 @@ export class GatePlacementSolver extends BaseSolver {
       })
       this.stats = {
         phase: "plan-gate-grid",
-        layerOffsets: this.plannedPlacement.layerOffsets,
         regionLayerBatches: this.placementBatches.length,
         placedBreakpoints: 0,
       }
@@ -70,7 +84,8 @@ export class GatePlacementSolver extends BaseSolver {
       this.visibleBreakoutPoints.push(
         ...this.plannedPlacement.breakoutPoints.filter(
           (point) =>
-            point.regionId === batch.regionId && point.layer === batch.layer,
+            point.regionId === batch.regionId &&
+            this.layerByConnection[point.connectionId] === batch.layer,
         ),
       )
       this.batchIndex += 1
@@ -89,7 +104,7 @@ export class GatePlacementSolver extends BaseSolver {
     this.stats = {
       phase: "finalize-shared-gate-slots",
       placedBreakpoints: this.output.breakoutPoints.length,
-      sharedGateSlots: this.output.sharedGateSlots.length,
+      sharedGateSlots: getSharedGateSlotCount(this.output.breakoutPoints),
     }
     this.solved = true
   }
@@ -123,7 +138,10 @@ export class GatePlacementSolver extends BaseSolver {
       const latestBatch = this.placementBatches[this.batchIndex - 1]!
       detail = `Placed region “${latestBatch.regionId}” on layer “${latestBatch.layer}” · ${this.batchIndex}/${this.placementBatches.length} batches`
     } else if (this.output) {
-      detail = `${this.output.breakoutPoints.length} gates placed; coincident layer positions grouped into ${this.output.sharedGateSlots.length} shared slots`
+      const sharedGateSlotCount = getSharedGateSlotCount(
+        this.output.breakoutPoints,
+      )
+      detail = `${this.output.breakoutPoints.length} gates placed; coincident layer positions form ${sharedGateSlotCount} shared slots`
     }
     let visualizationState: WindingBreakoutVisualizationState | undefined
     if (this.plannedPlacement) {
@@ -132,7 +150,6 @@ export class GatePlacementSolver extends BaseSolver {
       visualizationState = {
         referenceOrder: this.params.ordering.referenceOrder,
         breakoutPoints,
-        sharedGateSlots: this.output?.sharedGateSlots ?? [],
       }
     }
     const graphics = createSolverPhaseVisualization({
@@ -145,15 +162,19 @@ export class GatePlacementSolver extends BaseSolver {
     const plannedSlotGuides = (this.plannedPlacement?.breakoutPoints ?? [])
       .filter(
         (point) =>
-          !this.visualizationLayer || point.layer === this.visualizationLayer,
+          !this.visualizationLayer ||
+          this.layerByConnection[point.connectionId] ===
+            this.visualizationLayer,
       )
       .map((point) => ({
         center: point,
         radius: 0.065,
         fill: "rgba(255, 255, 255, 0.75)",
         stroke: "rgba(100, 116, 139, 0.5)",
-        label: `planned slot ${point.regionId} · ${point.layer} · ${point.slotIndex}`,
-        layer: getGraphicsLayer(this.params.input, [point.layer]),
+        label: `planned slot ${point.regionId} · ${this.layerByConnection[point.connectionId]}`,
+        layer: getGraphicsLayer(this.params.input, [
+          this.layerByConnection[point.connectionId]!,
+        ]),
       }))
     return {
       ...graphics,

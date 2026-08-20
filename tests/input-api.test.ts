@@ -46,18 +46,18 @@ test("zero regions fail validation", () => {
   )
 })
 
-test("layers are never reassigned", () => {
+test("output does not repeat caller-owned layers or derived placement data", () => {
   const input = cloneInput(ddrByte0Example)
   const output = solveSuccessfully(input)
-  const expectedLayers = new Map(
-    getCanonicalConnections(input).map((connection) => [
-      connection.id,
-      connection.layer,
-    ]),
-  )
 
+  expect(Object.keys(output)).toEqual(["breakoutPoints"])
   for (const point of output.breakoutPoints) {
-    expect(point.layer).toBe(expectedLayers.get(point.connectionId)!)
+    expect(Object.keys(point).sort()).toEqual([
+      "connectionId",
+      "regionId",
+      "x",
+      "y",
+    ])
   }
 })
 
@@ -148,19 +148,28 @@ test("invalid differential pairs fail validation", () => {
 
 test("differential pairs remain atomic on their declared layer", () => {
   const input = cloneInput(ddrByte0Example)
+  const canonicalConnections = getCanonicalConnections(input)
+  const layerByConnection = new Map(
+    canonicalConnections.map((connection) => [connection.id, connection.layer]),
+  )
   const pair = input.connections.find(
     (connection): connection is DifferentialPairInput =>
       "type" in connection && connection.type === "differential",
   )!
   const output = solveSuccessfully(input)
   const pairIds = pair.connections.map((connection) => connection.id)
-  const pairPoints = output.breakoutPoints.filter((point) =>
-    pairIds.includes(point.connectionId),
-  )
-
-  expect(pairPoints.every((point) => point.layer === pair.layer)).toBe(true)
   for (const region of input.regions) {
-    const order = output.gateOrderByLayerByRegion[region.id]![pair.layer]!
+    const vertical = region.edge === "left" || region.edge === "right"
+    const order = output.breakoutPoints
+      .filter(
+        (point) =>
+          point.regionId === region.id &&
+          layerByConnection.get(point.connectionId) === pair.layer,
+      )
+      .sort((first, second) =>
+        vertical ? first.y - second.y : first.x - second.x,
+      )
+      .map((point) => point.connectionId)
     expect(
       Math.abs(order.indexOf(pairIds[0]!) - order.indexOf(pairIds[1]!)),
     ).toBe(1)
@@ -175,7 +184,6 @@ test("all AM62L and LPDDR4 examples solve successfully", () => {
     fullDdrExample,
   ]) {
     const output = solveSuccessfully(cloneInput(input))
-    expect(output.solved).toBe(true)
     expect(output.breakoutPoints).toHaveLength(
       getCanonicalConnections(input).length * input.regions.length,
     )
