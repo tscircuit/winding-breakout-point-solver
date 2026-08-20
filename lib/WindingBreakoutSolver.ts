@@ -94,10 +94,6 @@ export class WindingBreakoutSolver extends BasePipelineSolver<WindingBreakoutSol
     ) {
       this.output = finalizeWindingBreakoutOutput({
         validated: this.getValidatedInput(),
-        ordering:
-          this.getRequiredStageOutput<ReferenceOrderingResult>(
-            "referenceOrdering",
-          ),
         placement: this.getRequiredStageOutput("gatePlacement"),
       })
       this.solved = true
@@ -111,7 +107,7 @@ export class WindingBreakoutSolver extends BasePipelineSolver<WindingBreakoutSol
       this.stats.phase = "finalize-output-validation"
     }
     if (this.output) {
-      this.stats.valid = this.output.validation.valid
+      this.stats.valid = true
       this.stats.breakoutPointCount = this.output.breakoutPoints.length
     }
   }
@@ -161,6 +157,8 @@ export class WindingBreakoutSolver extends BasePipelineSolver<WindingBreakoutSol
 
   override finalVisualize(): GraphicsObject | null {
     if (!this.output) return null
+    const ordering =
+      this.getRequiredStageOutput<ReferenceOrderingResult>("referenceOrdering")
     return createSolverPhaseVisualization({
       input: this.inputProblem,
       activeLayer: this.visualizationLayer,
@@ -168,9 +166,8 @@ export class WindingBreakoutSolver extends BasePipelineSolver<WindingBreakoutSol
       detail:
         "Valid: one layer-preserving breakout point per connection and region; pairs are adjacent",
       state: {
-        referenceOrder: this.output.referenceOrder,
+        referenceOrder: ordering.referenceOrder,
         breakoutPoints: this.output.breakoutPoints,
-        sharedGateSlots: this.output.sharedGateSlots,
       },
     })
   }

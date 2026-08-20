@@ -42,7 +42,7 @@ const reverseCanonicalConnections = (
     }
   })
 
-test("reordering canonical connections does not change geometric reference order", () => {
+test("reordering canonical connections does not change output", () => {
   const input = cloneInput(threeRegionExample)
   const first = solveSuccessfully(input)
   const reordered = solveSuccessfully({
@@ -50,6 +50,38 @@ test("reordering canonical connections does not change geometric reference order
     connections: reverseCanonicalConnections(input.connections),
   })
 
-  expect(reordered.referenceOrder).toEqual(first.referenceOrder)
+  expect(JSON.stringify(reordered)).toBe(JSON.stringify(first))
+})
+
+const reverseConnectionEndpoints = (
+  connections: readonly ConnectionOrDifferentialPair[],
+): ConnectionOrDifferentialPair[] =>
+  connections.map((connection) => {
+    if (!("type" in connection)) {
+      return { ...connection, endpoints: [...connection.endpoints].reverse() }
+    }
+    return {
+      ...connection,
+      connections: [
+        {
+          ...connection.connections[0],
+          endpoints: [...connection.connections[0].endpoints].reverse(),
+        },
+        {
+          ...connection.connections[1],
+          endpoints: [...connection.connections[1].endpoints].reverse(),
+        },
+      ],
+    }
+  })
+
+test("endpoint region ids make endpoint array order irrelevant", () => {
+  const input = cloneInput(threeRegionExample)
+  const first = solveSuccessfully(input)
+  const reordered = solveSuccessfully({
+    ...input,
+    connections: reverseConnectionEndpoints(input.connections),
+  })
+
   expect(JSON.stringify(reordered)).toBe(JSON.stringify(first))
 })

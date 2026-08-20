@@ -1,18 +1,20 @@
-import type { BreakoutPoint, BreakoutPointValidationResult } from "../types"
+import type { ValidatedRegion } from "../input/validate-winding-breakout-input"
+import type { BreakoutPoint } from "../types"
 
 export const validateBreakoutPoints = ({
   points,
   connectionIds,
-  regionIds,
+  regions,
   layerByConnection,
   atomicGroups,
 }: {
   points: readonly BreakoutPoint[]
   connectionIds: readonly string[]
-  regionIds: readonly string[]
+  regions: readonly ValidatedRegion[]
   layerByConnection: Readonly<Record<string, string>>
   atomicGroups: readonly (readonly [string, string])[]
-}): BreakoutPointValidationResult => {
+}): boolean => {
+  const regionIds = regions.map((region) => region.id)
   const endpointCounts = new Map<string, number>()
   for (const point of points) {
     const key = `${point.regionId}:${point.connectionId}`
@@ -21,45 +23,37 @@ export const validateBreakoutPoints = ({
   const expected = regionIds.flatMap((regionId) =>
     connectionIds.map((connectionId) => `${regionId}:${connectionId}`),
   )
-  const missingEndpoints = expected.filter(
-    (endpoint) => !endpointCounts.has(endpoint),
-  )
-  const duplicateEndpoints = [...endpointCounts]
-    .filter(([, count]) => count > 1)
-    .map(([endpoint]) => endpoint)
-  const layerInconsistencies = points
-    .filter((point) => layerByConnection[point.connectionId] !== point.layer)
-    .map((point) => `${point.regionId}:${point.connectionId}`)
-  const atomicGroupViolations = atomicGroups
-    .filter((group) => {
-      if (
-        new Set(group.map((connectionId) => layerByConnection[connectionId]))
-          .size !== 1
-      ) {
-        return true
-      }
-      return regionIds.some((regionId) => {
-        const groupPoints = points.filter(
-          (point) =>
-            point.regionId === regionId && group.includes(point.connectionId),
+  const endpointsAreValid =
+    endpointCounts.size === expected.length &&
+    expected.every((endpoint) => endpointCounts.get(endpoint) === 1)
+  const atomicGroupsAreValid = atomicGroups.every((group) => {
+    if (
+      new Set(group.map((connectionId) => layerByConnection[connectionId]))
+        .size !== 1
+    ) {
+      return false
+    }
+    return regions.every((region) => {
+      const layer = layerByConnection[group[0]!]
+      const layerPoints = points.filter(
+        (point) =>
+          point.regionId === region.id &&
+          layerByConnection[point.connectionId] === layer,
+      )
+      const vertical = region.edge === "left" || region.edge === "right"
+      const orderedConnectionIds = [...layerPoints]
+        .sort((first, second) =>
+          vertical ? first.y - second.y : first.x - second.x,
         )
-        return (
-          groupPoints.length !== group.length ||
-          new Set(groupPoints.map((point) => point.layer)).size !== 1 ||
-          Math.abs(groupPoints[0]!.slotIndex - groupPoints[1]!.slotIndex) !== 1
-        )
-      })
+        .map((point) => point.connectionId)
+      const firstIndex = orderedConnectionIds.indexOf(group[0]!)
+      const secondIndex = orderedConnectionIds.indexOf(group[1]!)
+      return (
+        firstIndex !== -1 &&
+        secondIndex !== -1 &&
+        Math.abs(firstIndex - secondIndex) === 1
+      )
     })
-    .map((group) => group.join("/"))
-  return {
-    valid:
-      missingEndpoints.length === 0 &&
-      duplicateEndpoints.length === 0 &&
-      layerInconsistencies.length === 0 &&
-      atomicGroupViolations.length === 0,
-    missingEndpoints,
-    duplicateEndpoints,
-    layerInconsistencies,
-    atomicGroupViolations,
-  }
+  })
+  return endpointsAreValid && atomicGroupsAreValid
 }

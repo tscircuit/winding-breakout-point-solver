@@ -1,17 +1,14 @@
 import type { GraphicsObject } from "graphics-debug"
 import { getCanonicalConnections } from "../input/get-canonical-connections"
-import type {
-  WindingBreakoutOutput,
-  WindingBreakoutSolverInput,
-} from "../types"
+import type { BreakoutPoint, WindingBreakoutSolverInput } from "../types"
 import { getConnectionColor } from "./get-connection-color"
 import { getGraphicsLayer } from "./get-graphics-layer"
 
 /** Draw only the calculated breakout points; this solver does not route. */
-export type WindingBreakoutVisualizationState = Pick<
-  WindingBreakoutOutput,
-  "referenceOrder" | "breakoutPoints" | "sharedGateSlots"
->
+export interface WindingBreakoutVisualizationState {
+  readonly referenceOrder: readonly string[]
+  readonly breakoutPoints: readonly BreakoutPoint[]
+}
 
 export const createStateGraphics = (
   input: WindingBreakoutSolverInput,
@@ -19,9 +16,28 @@ export const createStateGraphics = (
   activeLayer?: string,
 ): GraphicsObject => {
   const connections = getCanonicalConnections(input)
-  const breakoutPoints = state.breakoutPoints.filter(
-    (point) => !activeLayer || point.layer === activeLayer,
+  const layerByConnection = new Map(
+    connections.map((connection) => [connection.id, connection.layer]),
   )
+  const breakoutPoints = state.breakoutPoints.filter(
+    (point) =>
+      !activeLayer || layerByConnection.get(point.connectionId) === activeLayer,
+  )
+  const sharedGateSlots = new Map<
+    string,
+    { readonly x: number; readonly y: number; readonly layers: Set<string> }
+  >()
+  for (const point of state.breakoutPoints) {
+    const key = `${point.regionId}:${point.x.toFixed(9)}:${point.y.toFixed(9)}`
+    const slot = sharedGateSlots.get(key) ?? {
+      x: point.x,
+      y: point.y,
+      layers: new Set<string>(),
+    }
+    const layer = layerByConnection.get(point.connectionId)
+    if (layer) slot.layers.add(layer)
+    sharedGateSlots.set(key, slot)
+  }
   const guideLines = state.referenceOrder.flatMap((connectionId) => {
     const connection = connections.find(
       (candidate) => candidate.id === connectionId,
@@ -56,10 +72,10 @@ export const createStateGraphics = (
   })
   return {
     lines: guideLines,
-    circles: state.sharedGateSlots.flatMap((slot) => {
-      const layers = slot.indicators
-        .map((indicator) => indicator.layer)
-        .filter((layer) => !activeLayer || layer === activeLayer)
+    circles: [...sharedGateSlots.values()].flatMap((slot) => {
+      const layers = [...slot.layers].filter(
+        (layer) => !activeLayer || layer === activeLayer,
+      )
       if (layers.length === 0) return []
       return [
         {
@@ -75,8 +91,10 @@ export const createStateGraphics = (
       x: point.x,
       y: point.y,
       color: getConnectionColor(point.connectionId),
-      label: `${point.connectionId} · ${point.layer}`,
-      layer: getGraphicsLayer(input, [point.layer]),
+      label: `${point.connectionId} · ${layerByConnection.get(point.connectionId)}`,
+      layer: getGraphicsLayer(input, [
+        layerByConnection.get(point.connectionId)!,
+      ]),
     })),
   }
 }
