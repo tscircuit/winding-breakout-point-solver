@@ -164,9 +164,10 @@ test("differential pairs remain atomic on their selected layer", () => {
           point.regionId === region.id &&
           output.layerByConnection[point.connectionId] === pairLayer,
       )
-      .sort((first, second) =>
-        vertical ? first.y - second.y : first.x - second.x,
-      )
+      .sort((first, second) => {
+        if (vertical) return first.y - second.y
+        return first.x - second.x
+      })
       .map((point) => point.connectionId)
     expect(
       Math.abs(order.indexOf(pairIds[0]!) - order.indexOf(pairIds[1]!)),

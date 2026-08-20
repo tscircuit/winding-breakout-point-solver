@@ -316,12 +316,17 @@ export const validateWindingBreakoutInput = (
       })
     }
 
-    return {
+    let validatedBus: ValidatedBus = {
       id: busId,
       connectionIds: busConnectionIds,
-      ...(preferredLayer !== undefined ? { preferredLayer } : {}),
-      ...(preferredLayers !== undefined ? { preferredLayers } : {}),
     }
+    if (preferredLayer !== undefined) {
+      validatedBus = { ...validatedBus, preferredLayer }
+    }
+    if (preferredLayers !== undefined) {
+      validatedBus = { ...validatedBus, preferredLayers }
+    }
+    return validatedBus
   })
 
   for (const [

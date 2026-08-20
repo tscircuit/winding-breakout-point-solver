@@ -1,5 +1,6 @@
 import type {
   ConnectionOrDifferentialPair,
+  WindingBreakoutBusInput,
   WindingBreakoutSolverInput,
 } from "../../lib/types"
 
@@ -293,6 +294,26 @@ export const createAm62lExample = (
     })
   }
 
+  const buses = options.buses.map((bus) => {
+    let solverBus: WindingBreakoutBusInput = {
+      id: bus.id,
+      connectionIds: bus.ports.map((port) => port.id),
+    }
+    if (bus.preferredLayer !== undefined) {
+      solverBus = {
+        ...solverBus,
+        preferredLayer: bus.preferredLayer,
+      }
+    }
+    if (bus.preferredLayers !== undefined) {
+      solverBus = {
+        ...solverBus,
+        preferredLayers: bus.preferredLayers,
+      }
+    }
+    return solverBus
+  })
+
   return {
     regions: [
       {
@@ -317,16 +338,7 @@ export const createAm62lExample = (
       },
     ],
     connections,
-    buses: options.buses.map((bus) => ({
-      id: bus.id,
-      connectionIds: bus.ports.map((port) => port.id),
-      ...(bus.preferredLayer !== undefined
-        ? { preferredLayer: bus.preferredLayer }
-        : {}),
-      ...(bus.preferredLayers !== undefined
-        ? { preferredLayers: bus.preferredLayers }
-        : {}),
-    })),
+    buses,
     boundaryPointSpacing: 0.48,
   }
 }
