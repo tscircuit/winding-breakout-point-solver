@@ -31,11 +31,25 @@ export const validateBreakoutPoints = ({
     .filter((point) => layerByConnection[point.connectionId] !== point.layer)
     .map((point) => `${point.regionId}:${point.connectionId}`)
   const atomicGroupViolations = atomicGroups
-    .filter(
-      (group) =>
+    .filter((group) => {
+      if (
         new Set(group.map((connectionId) => layerByConnection[connectionId]))
-          .size !== 1,
-    )
+          .size !== 1
+      ) {
+        return true
+      }
+      return regionIds.some((regionId) => {
+        const groupPoints = points.filter(
+          (point) =>
+            point.regionId === regionId && group.includes(point.connectionId),
+        )
+        return (
+          groupPoints.length !== group.length ||
+          new Set(groupPoints.map((point) => point.layer)).size !== 1 ||
+          Math.abs(groupPoints[0]!.slotIndex - groupPoints[1]!.slotIndex) !== 1
+        )
+      })
+    })
     .map((group) => group.join("/"))
   return {
     valid:

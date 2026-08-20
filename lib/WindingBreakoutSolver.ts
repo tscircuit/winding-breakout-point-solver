@@ -1,65 +1,144 @@
-import { BaseSolver } from "@tscircuit/solver-utils"
-import type { GraphicsObject } from "graphics-debug"
 import {
-  WindingBreakoutInvariantError,
-  WindingBreakoutOutputUnavailableError,
-} from "./input/errors"
+  BasePipelineSolver,
+  type BaseSolver,
+  type PipelineStep,
+  definePipelineStep,
+} from "@tscircuit/solver-utils"
+import type { GraphicsObject } from "graphics-debug"
+import { WindingBreakoutOutputUnavailableError } from "./input/errors"
 import {
   type ValidatedWindingInput,
   validateWindingBreakoutInput,
 } from "./input/validate-winding-breakout-input"
-import { solveWindingBreakout } from "./solve-winding-breakout"
+import {
+  GatePlacementSolver,
+  type GatePlacementSolverParams,
+} from "./solvers/GatePlacementSolver"
+import {
+  ReferenceOrderingSolver,
+  type ReferenceOrderingResult,
+  type ReferenceOrderingSolverParams,
+} from "./solvers/ReferenceOrderingSolver"
 import type { WindingBreakoutOutput, WindingBreakoutSolverInput } from "./types"
-import { createWindingBreakoutVisualization } from "./visualization/create-winding-breakout-visualization"
+import { finalizeWindingBreakoutOutput } from "./validation/finalize-winding-breakout-output"
+import { createSolverPhaseVisualization } from "./visualization/create-solver-phase-visualization"
 
-export class WindingBreakoutSolver extends BaseSolver {
-  private readonly input: WindingBreakoutSolverInput
+interface LayerAwareSolver extends BaseSolver {
+  setVisualizationLayer(layer?: string): void
+}
+
+const PIPELINE_STAGE_NAMES = ["referenceOrdering", "gatePlacement"] as const
+
+export class WindingBreakoutSolver extends BasePipelineSolver<WindingBreakoutSolverInput> {
   private validatedInput?: ValidatedWindingInput
   private output?: WindingBreakoutOutput
   private visualizationLayer?: string
 
+  override pipelineDef: PipelineStep<BaseSolver>[] = [
+    definePipelineStep(
+      "referenceOrdering",
+      ReferenceOrderingSolver,
+      (pipeline: WindingBreakoutSolver): [ReferenceOrderingSolverParams] => [
+        {
+          input: pipeline.inputProblem,
+          validated: pipeline.getValidatedInput(),
+          visualizationLayer: pipeline.visualizationLayer,
+        },
+      ],
+    ),
+    definePipelineStep(
+      "gatePlacement",
+      GatePlacementSolver,
+      (pipeline: WindingBreakoutSolver): [GatePlacementSolverParams] => [
+        {
+          input: pipeline.inputProblem,
+          validated: pipeline.getValidatedInput(),
+          ordering:
+            pipeline.getRequiredStageOutput<ReferenceOrderingResult>(
+              "referenceOrdering",
+            ),
+          visualizationLayer: pipeline.visualizationLayer,
+        },
+      ],
+    ),
+  ]
+
   constructor(input: WindingBreakoutSolverInput) {
-    super()
-    this.input = input
+    super(input)
+  }
+
+  /** Input validation is fail-fast setup work, not a pipeline stage. */
+  override _setup(): void {
+    this.validatedInput = validateWindingBreakoutInput(this.inputProblem)
+    this.stats = {
+      phase: "setup-input-validation",
+      regionCount: this.validatedInput.regions.length,
+      connectionCount: this.validatedInput.connections.length,
+      layerCount: this.validatedInput.layerNames.length,
+    }
+  }
+
+  private getValidatedInput(): ValidatedWindingInput {
+    if (!this.validatedInput) {
+      throw new Error("WindingBreakoutSolver: input has not been validated")
+    }
+    return this.validatedInput
+  }
+
+  override _step(): void {
+    super._step()
+    if (
+      !this.output &&
+      !this.activeSubSolver &&
+      this.currentPipelineStageIndex >= this.pipelineDef.length
+    ) {
+      this.output = finalizeWindingBreakoutOutput({
+        validated: this.getValidatedInput(),
+        ordering:
+          this.getRequiredStageOutput<ReferenceOrderingResult>(
+            "referenceOrdering",
+          ),
+        placement: this.getRequiredStageOutput("gatePlacement"),
+      })
+      this.solved = true
+    }
+    this.stats = {
+      phase: this.solved
+        ? "finalize-output-validation"
+        : this.getCurrentStageName(),
+      completedStages: this.currentPipelineStageIndex,
+      totalStages: this.pipelineDef.length,
+      ...(this.output
+        ? {
+            valid: this.output.validation.valid,
+            breakoutPointCount: this.output.breakoutPoints.length,
+          }
+        : {}),
+    }
+  }
+
+  private getRequiredStageOutput<T>(stageName: string): T {
+    const output = this.getStageOutput<T>(stageName)
+    if (output === undefined) {
+      throw new Error(
+        `WindingBreakoutSolver: pipeline stage “${stageName}” has no output`,
+      )
+    }
+    return output
   }
 
   setVisualizationLayer(layer?: string): void {
     this.visualizationLayer = layer
-  }
-
-  override _setup(): void {
-    this.validatedInput = validateWindingBreakoutInput(this.input)
-    this.MAX_ITERATIONS = 1
-    this.stats = {
-      phase: "place-breakpoints",
-      connectionCount: this.validatedInput.connections.length,
-      placedBreakpoints: 0,
+    for (const stageName of PIPELINE_STAGE_NAMES) {
+      const solver = this.getSolver<BaseSolver>(stageName)
+      if (solver && "setVisualizationLayer" in solver) {
+        ;(solver as LayerAwareSolver).setVisualizationLayer(layer)
+      }
     }
-  }
-
-  override _step(): void {
-    if (!this.validatedInput) {
-      throw new WindingBreakoutInvariantError(
-        "WindingBreakoutSolver: setup did not validate the input",
-      )
-    }
-    this.output = solveWindingBreakout(this.input, this.validatedInput)
-    this.stats = {
-      ...this.stats,
-      phase: "complete",
-      placedBreakpoints: this.output.breakoutPoints.length,
-      validBreakpoints: this.output.validation.valid,
-    }
-    this.solved = true
-  }
-
-  computeProgress(): number {
-    if (this.solved) return 1
-    return 0
   }
 
   override getConstructorParams(): [WindingBreakoutSolverInput] {
-    return [this.input]
+    return [this.inputProblem]
   }
 
   override getOutput(): WindingBreakoutOutput {
@@ -71,11 +150,37 @@ export class WindingBreakoutSolver extends BaseSolver {
     return this.output
   }
 
+  override initialVisualize(): GraphicsObject {
+    return createSolverPhaseVisualization({
+      input: this.inputProblem,
+      activeLayer: this.visualizationLayer,
+      phase: "Input · Validated during setup",
+      detail:
+        "Region bounds, breakout edges, connection layers, and canonical endpoints",
+    })
+  }
+
+  override finalVisualize(): GraphicsObject | null {
+    if (!this.output) return null
+    return createSolverPhaseVisualization({
+      input: this.inputProblem,
+      activeLayer: this.visualizationLayer,
+      phase: "Output · Validated after gate placement",
+      detail:
+        "Valid: one layer-preserving breakout point per connection and region; pairs are adjacent",
+      state: {
+        referenceOrder: this.output.referenceOrder,
+        breakoutPoints: this.output.breakoutPoints,
+        sharedGateSlots: this.output.sharedGateSlots,
+      },
+    })
+  }
+
   override visualize(): GraphicsObject {
-    return createWindingBreakoutVisualization(
-      this.input,
-      this.output,
-      this.visualizationLayer,
-    )
+    return {
+      ...super.visualize(),
+      title: "Winding breakout solver · step-by-step pipeline",
+      coordinateSystem: "cartesian",
+    }
   }
 }

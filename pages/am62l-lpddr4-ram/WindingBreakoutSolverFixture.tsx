@@ -6,11 +6,17 @@ import type { WindingBreakoutSolverInput } from "../../lib/types"
 
 export function WindingBreakoutSolverFixture({
   input,
+  createSolver,
 }: {
   readonly input: WindingBreakoutSolverInput
+  readonly createSolver?: (
+    input: WindingBreakoutSolverInput,
+  ) => WindingBreakoutSolver
 }): React.JSX.Element {
   const [activeLayer, setActiveLayer] = useState("")
-  const [solver] = useState(() => new WindingBreakoutSolver(input))
+  const [solver] = useState(() =>
+    createSolver ? createSolver(input) : new WindingBreakoutSolver(input),
+  )
   const signalLayers = getLayerNames(input)
   return (
     <main style={{ minHeight: "100vh", background: "#fff" }}>

@@ -8,9 +8,14 @@ import { getConnectionColor } from "./get-connection-color"
 import { getGraphicsLayer } from "./get-graphics-layer"
 
 /** Draw only the calculated breakout points; this solver does not route. */
+export type WindingBreakoutVisualizationState = Pick<
+  WindingBreakoutOutput,
+  "referenceOrder" | "breakoutPoints" | "sharedGateSlots"
+>
+
 export const createStateGraphics = (
   input: WindingBreakoutSolverInput,
-  state: WindingBreakoutOutput,
+  state: WindingBreakoutVisualizationState,
   activeLayer?: string,
 ): GraphicsObject => {
   const connections = getCanonicalConnections(input)
@@ -38,7 +43,7 @@ export const createStateGraphics = (
       if (regionIndex === 0) return [endpoint.position, breakout]
       return [breakout, endpoint.position]
     })
-    if (points.length < 4) return []
+    if (points.length < 2) return []
     return [
       {
         points,
