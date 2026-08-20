@@ -14,9 +14,10 @@ export function WindingBreakoutSolverFixture({
   ) => WindingBreakoutSolver
 }): React.JSX.Element {
   const [activeLayer, setActiveLayer] = useState("")
-  const [solver] = useState(() =>
-    createSolver ? createSolver(input) : new WindingBreakoutSolver(input),
-  )
+  const [solver] = useState(() => {
+    if (createSolver) return createSolver(input)
+    return new WindingBreakoutSolver(input)
+  })
   const signalLayers = getLayerNames(input)
   return (
     <main style={{ minHeight: "100vh", background: "#fff" }}>

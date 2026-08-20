@@ -8,6 +8,7 @@ import { WindingBreakoutInvariantError } from "../input/errors"
 import type { ValidatedWindingInput } from "../input/validate-winding-breakout-input"
 import type { BreakoutPoint, WindingBreakoutSolverInput } from "../types"
 import { createSolverPhaseVisualization } from "../visualization/create-solver-phase-visualization"
+import type { WindingBreakoutVisualizationState } from "../visualization/create-state-graphics"
 import { getGraphicsLayer } from "../visualization/get-graphics-layer"
 import type { ReferenceOrderingResult } from "./ReferenceOrderingSolver"
 
@@ -94,10 +95,9 @@ export class GatePlacementSolver extends BaseSolver {
   }
 
   computeProgress(): number {
-    const completedMicrosteps =
-      (this.plannedPlacement === undefined ? 0 : 1) +
-      this.batchIndex +
-      (this.output === undefined ? 0 : 1)
+    let completedMicrosteps = this.batchIndex
+    if (this.plannedPlacement) completedMicrosteps += 1
+    if (this.output) completedMicrosteps += 1
     return completedMicrosteps / this.MAX_ITERATIONS
   }
 
@@ -125,20 +125,22 @@ export class GatePlacementSolver extends BaseSolver {
     } else if (this.output) {
       detail = `${this.output.breakoutPoints.length} gates placed; coincident layer positions grouped into ${this.output.sharedGateSlots.length} shared slots`
     }
+    let visualizationState: WindingBreakoutVisualizationState | undefined
+    if (this.plannedPlacement) {
+      let breakoutPoints: readonly BreakoutPoint[] = this.visibleBreakoutPoints
+      if (this.output) breakoutPoints = this.output.breakoutPoints
+      visualizationState = {
+        referenceOrder: this.params.ordering.referenceOrder,
+        breakoutPoints,
+        sharedGateSlots: this.output?.sharedGateSlots ?? [],
+      }
+    }
     const graphics = createSolverPhaseVisualization({
       input: this.params.input,
       activeLayer: this.visualizationLayer,
       phase: "Step 2 · Place boundary gates",
       detail,
-      state: this.plannedPlacement
-        ? {
-            referenceOrder: this.params.ordering.referenceOrder,
-            breakoutPoints: this.output
-              ? this.output.breakoutPoints
-              : this.visibleBreakoutPoints,
-            sharedGateSlots: this.output?.sharedGateSlots ?? [],
-          }
-        : undefined,
+      state: visualizationState,
     })
     const plannedSlotGuides = (this.plannedPlacement?.breakoutPoints ?? [])
       .filter(

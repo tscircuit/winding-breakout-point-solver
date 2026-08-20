@@ -77,8 +77,8 @@ export class ReferenceOrderingSolver extends BaseSolver {
   }
 
   computeProgress(): number {
-    const completedMicrosteps =
-      this.currentRegionIndex + (this.output === undefined ? 0 : 1)
+    let completedMicrosteps = this.currentRegionIndex
+    if (this.output) completedMicrosteps += 1
     return completedMicrosteps / this.MAX_ITERATIONS
   }
 

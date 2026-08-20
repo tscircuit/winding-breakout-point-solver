@@ -103,17 +103,16 @@ export class WindingBreakoutSolver extends BasePipelineSolver<WindingBreakoutSol
       this.solved = true
     }
     this.stats = {
-      phase: this.solved
-        ? "finalize-output-validation"
-        : this.getCurrentStageName(),
+      phase: this.getCurrentStageName(),
       completedStages: this.currentPipelineStageIndex,
       totalStages: this.pipelineDef.length,
-      ...(this.output
-        ? {
-            valid: this.output.validation.valid,
-            breakoutPointCount: this.output.breakoutPoints.length,
-          }
-        : {}),
+    }
+    if (this.solved) {
+      this.stats.phase = "finalize-output-validation"
+    }
+    if (this.output) {
+      this.stats.valid = this.output.validation.valid
+      this.stats.breakoutPointCount = this.output.breakoutPoints.length
     }
   }
 

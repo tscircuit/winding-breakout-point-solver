@@ -30,10 +30,12 @@ export const createSolverPhaseVisualization = ({
   state?: WindingBreakoutVisualizationState
 }): GraphicsObject => {
   const inputGraphics = createInputGraphics(input, activeLayer)
-  const stateGraphics = state
-    ? createStateGraphics(input, state, activeLayer)
-    : undefined
-  const displayedLayers = activeLayer ? [activeLayer] : getLayerNames(input)
+  let stateGraphics: GraphicsObject | undefined
+  if (state) {
+    stateGraphics = createStateGraphics(input, state, activeLayer)
+  }
+  let displayedLayers = getLayerNames(input)
+  if (activeLayer) displayedLayers = [activeLayer]
   const textLayer = getGraphicsLayer(input, displayedLayers)
   const maxY = Math.max(...input.regions.map((region) => region.bounds.maxY))
   const minX = Math.min(...input.regions.map((region) => region.bounds.minX))

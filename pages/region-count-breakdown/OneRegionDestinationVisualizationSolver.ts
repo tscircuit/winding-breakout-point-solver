@@ -44,27 +44,28 @@ export class OneRegionDestinationVisualizationSolver extends WindingBreakoutSolv
         layer: getGraphicsLayer(this.inputProblem, [connection.layer]),
       }
     })
-    const destinationLines = placement
-      ? visibleDestinations.flatMap((destination) => {
-          const connection = connections.find(
-            (candidate) => candidate.id === destination.connectionId,
-          )!
-          const breakout = placement.breakoutPoints.find(
-            (point) => point.connectionId === destination.connectionId,
-          )
-          if (!breakout) return []
-          return [
-            {
-              points: [breakout, destination.position],
-              strokeColor: `${getConnectionColor(destination.connectionId)}88`,
-              strokeWidth: 0.018,
-              strokeDash: [0.06, 0.05],
-              label: `${destination.connectionId} breakout continuation`,
-              layer: getGraphicsLayer(this.inputProblem, [connection.layer]),
-            },
-          ]
-        })
-      : []
+    let destinationLines: NonNullable<GraphicsObject["lines"]> = []
+    if (placement) {
+      destinationLines = visibleDestinations.flatMap((destination) => {
+        const connection = connections.find(
+          (candidate) => candidate.id === destination.connectionId,
+        )!
+        const breakout = placement.breakoutPoints.find(
+          (point) => point.connectionId === destination.connectionId,
+        )
+        if (!breakout) return []
+        return [
+          {
+            points: [breakout, destination.position],
+            strokeColor: `${getConnectionColor(destination.connectionId)}88`,
+            strokeWidth: 0.018,
+            strokeDash: [0.06, 0.05],
+            label: `${destination.connectionId} breakout continuation`,
+            layer: getGraphicsLayer(this.inputProblem, [connection.layer]),
+          },
+        ]
+      })
+    }
     const destinationCircles = visibleDestinations.map((destination) => {
       const connection = connections.find(
         (candidate) => candidate.id === destination.connectionId,
