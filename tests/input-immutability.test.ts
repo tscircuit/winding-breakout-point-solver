@@ -6,7 +6,7 @@ import {
   solveSuccessfully,
 } from "./fixtures/solver-test-utils"
 
-test("solving leaves a deeply frozen caller input unchanged", () => {
+test("caller connection data is preserved", () => {
   const input = deepFreeze(cloneInput(ddrByte0Example))
   const before = JSON.stringify(input)
 
@@ -14,7 +14,7 @@ test("solving leaves a deeply frozen caller input unchanged", () => {
 
   expect(JSON.stringify(input)).toBe(before)
   expect(Object.isFrozen(input)).toBe(true)
-  expect(input.regions.every((region) => Object.isFrozen(region.ports))).toBe(
-    true,
-  )
+  expect(
+    input.connections.every((connection) => Object.isFrozen(connection)),
+  ).toBe(true)
 })

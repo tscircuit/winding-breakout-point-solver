@@ -1,10 +1,4 @@
-import type {
-  BreakoutBand,
-  BreakoutPoint,
-  BreakoutPointValidationResult,
-} from "../types"
-
-const EPSILON = 1e-9
+import type { BreakoutPoint, BreakoutPointValidationResult } from "../types"
 
 export const validateBreakoutPoints = ({
   points,
@@ -12,14 +6,12 @@ export const validateBreakoutPoints = ({
   regionIds,
   layerByConnection,
   atomicGroups,
-  bandByBus,
 }: {
   points: readonly BreakoutPoint[]
   connectionIds: readonly string[]
   regionIds: readonly string[]
   layerByConnection: Readonly<Record<string, string>>
-  atomicGroups: readonly (readonly string[])[]
-  bandByBus: Readonly<Record<string, BreakoutBand>>
+  atomicGroups: readonly (readonly [string, string])[]
 }): BreakoutPointValidationResult => {
   const endpointCounts = new Map<string, number>()
   for (const point of points) {
@@ -38,15 +30,11 @@ export const validateBreakoutPoints = ({
   const layerInconsistencies = points
     .filter((point) => layerByConnection[point.connectionId] !== point.layer)
     .map((point) => `${point.regionId}:${point.connectionId}`)
-  const bandViolations = points.filter((point) => {
-    const band = bandByBus[point.busId]
-    return !band || point.y < band.min - EPSILON || point.y > band.max + EPSILON
-  })
   const atomicGroupViolations = atomicGroups
     .filter(
       (group) =>
         new Set(group.map((connectionId) => layerByConnection[connectionId]))
-          .size > 1,
+          .size !== 1,
     )
     .map((group) => group.join("/"))
   return {
@@ -54,12 +42,10 @@ export const validateBreakoutPoints = ({
       missingEndpoints.length === 0 &&
       duplicateEndpoints.length === 0 &&
       layerInconsistencies.length === 0 &&
-      bandViolations.length === 0 &&
       atomicGroupViolations.length === 0,
     missingEndpoints,
     duplicateEndpoints,
     layerInconsistencies,
-    bandViolations,
     atomicGroupViolations,
   }
 }

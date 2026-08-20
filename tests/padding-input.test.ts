@@ -1,20 +1,15 @@
 import { expect, test } from "bun:test"
 import { oneMillimeterPaddingInput } from "../examples/padding/one-millimeter-padding-input"
 import { WindingBreakoutSolver } from "../lib"
+import { getCanonicalConnections } from "../lib/input/get-canonical-connections"
 
 test("1mm padding input includes every AM62L/LPDDR4 DDR connection", () => {
-  expect(
-    oneMillimeterPaddingInput.regions.map((region) => region.ports.length),
-  ).toEqual([33, 33])
-
-  for (const region of oneMillimeterPaddingInput.regions) {
-    expect(
-      region.bounds.maxX - region.bounds.minX - region.component.width,
-    ).toBeCloseTo(2)
-    expect(
-      region.bounds.maxY - region.bounds.minY - region.component.height,
-    ).toBeCloseTo(2)
-  }
+  expect(getCanonicalConnections(oneMillimeterPaddingInput)).toHaveLength(33)
+  const [soc, ram] = oneMillimeterPaddingInput.regions
+  expect(soc!.bounds.maxX - soc!.bounds.minX).toBeCloseTo(13.25616)
+  expect(soc!.bounds.maxY - soc!.bounds.minY).toBeCloseTo(13.25616)
+  expect(ram!.bounds.maxX - ram!.bounds.minX).toBeCloseTo(16.05)
+  expect(ram!.bounds.maxY - ram!.bounds.minY).toBeCloseTo(11.2)
 
   const solver = new WindingBreakoutSolver(oneMillimeterPaddingInput)
   solver.solve()

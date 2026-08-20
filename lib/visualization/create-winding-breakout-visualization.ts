@@ -1,6 +1,5 @@
 import type { GraphicsObject } from "graphics-debug"
 import type {
-  WindingBreakoutDiagnosticOutput,
   WindingBreakoutOutput,
   WindingBreakoutSolverInput,
 } from "../types"
@@ -10,7 +9,7 @@ import { createStateGraphics } from "./create-state-graphics"
 /** Compose the solver-native, layer-aware winding breakout debug view. */
 export const createWindingBreakoutVisualization = (
   input: WindingBreakoutSolverInput,
-  state?: WindingBreakoutOutput | WindingBreakoutDiagnosticOutput,
+  state?: WindingBreakoutOutput,
   activeLayer?: string,
 ): GraphicsObject => {
   const inputGraphics = createInputGraphics(input, activeLayer)
@@ -18,10 +17,7 @@ export const createWindingBreakoutVisualization = (
     ? createStateGraphics(input, state, activeLayer)
     : {}
   return {
-    title:
-      state?.solved === false
-        ? "Winding breakout diagnostic (unsolved)"
-        : "Winding breakout solver",
+    title: "Winding breakout solver",
     coordinateSystem: "cartesian",
     rects: inputGraphics.rects,
     polygons: inputGraphics.polygons,

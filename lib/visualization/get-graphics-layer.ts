@@ -1,13 +1,12 @@
 import type { WindingBreakoutSolverInput } from "../types"
+import { getLayerNames } from "../get-layer-names"
 
 /** Convert signal-layer IDs to the layer metadata understood by graphics-debug. */
 export const getGraphicsLayer = (
   input: WindingBreakoutSolverInput,
   layerIds: readonly string[],
 ): string => {
-  const signalLayerIds = input.stackup
-    .filter((entry) => entry.type === "signal")
-    .map((entry) => entry.id)
+  const signalLayerIds = getLayerNames(input)
   const indexes = [...new Set(layerIds)].map((layerId) => {
     const index = signalLayerIds.indexOf(layerId)
     if (index < 0) {
