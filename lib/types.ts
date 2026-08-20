@@ -59,9 +59,9 @@ export interface WindingBreakoutSolverInput {
 export interface BreakoutPoint extends Point {
   readonly regionId: string
   readonly connectionId: string
+  readonly layer: string
 }
 
 export interface WindingBreakoutOutput {
   readonly breakoutPoints: readonly BreakoutPoint[]
-  readonly layerByConnection: Readonly<Record<string, string>>
 }

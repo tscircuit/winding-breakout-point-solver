@@ -9,7 +9,6 @@ const GEOMETRY_EPSILON = 1e-9
 
 export interface GatePlacementResult {
   readonly breakoutPoints: readonly BreakoutPoint[]
-  readonly layerByConnection: Readonly<Record<string, string>>
 }
 
 const isVerticalEdge = (edge: ValidatedRegion["edge"]): boolean =>
@@ -208,6 +207,7 @@ export const placeBreakoutGates = ({
       gateOrderByLayer[layer]!.map((connectionId, slotIndex) => ({
         regionId: region.id,
         connectionId,
+        layer,
         ...pointOnEdge(
           region,
           axes[slotIndex]! + layerOffsets[layer]!,
@@ -216,5 +216,5 @@ export const placeBreakoutGates = ({
       })),
     ),
   )
-  return { breakoutPoints, layerByConnection }
+  return { breakoutPoints }
 }

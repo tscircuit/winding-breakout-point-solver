@@ -87,8 +87,7 @@ export class GatePlacementSolver extends BaseSolver {
       this.visibleBreakoutPoints.push(
         ...this.plannedPlacement.breakoutPoints.filter(
           (point) =>
-            point.regionId === batch.regionId &&
-            this.layerByConnection[point.connectionId] === batch.layer,
+            point.regionId === batch.regionId && point.layer === batch.layer,
         ),
       )
       this.batchIndex += 1
@@ -153,7 +152,6 @@ export class GatePlacementSolver extends BaseSolver {
       visualizationState = {
         referenceOrder: this.params.ordering.referenceOrder,
         breakoutPoints,
-        layerByConnection: this.layerByConnection,
       }
     }
     const graphics = createSolverPhaseVisualization({
@@ -166,19 +164,15 @@ export class GatePlacementSolver extends BaseSolver {
     const plannedSlotGuides = (this.plannedPlacement?.breakoutPoints ?? [])
       .filter(
         (point) =>
-          !this.visualizationLayer ||
-          this.layerByConnection[point.connectionId] ===
-            this.visualizationLayer,
+          !this.visualizationLayer || point.layer === this.visualizationLayer,
       )
       .map((point) => ({
         center: point,
         radius: 0.065,
         fill: "rgba(255, 255, 255, 0.75)",
         stroke: "rgba(100, 116, 139, 0.5)",
-        label: `planned slot ${point.regionId} · ${this.layerByConnection[point.connectionId]}`,
-        layer: getGraphicsLayer(this.params.input, [
-          this.layerByConnection[point.connectionId]!,
-        ]),
+        label: `planned slot ${point.regionId} · ${point.layer}`,
+        layer: getGraphicsLayer(this.params.input, [point.layer]),
       }))
     return {
       ...graphics,

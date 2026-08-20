@@ -8,7 +8,6 @@ import { getGraphicsLayer } from "./get-graphics-layer"
 export interface WindingBreakoutVisualizationState {
   readonly referenceOrder: readonly string[]
   readonly breakoutPoints: readonly BreakoutPoint[]
-  readonly layerByConnection: Readonly<Record<string, string>>
 }
 
 export const createStateGraphics = (
@@ -17,10 +16,8 @@ export const createStateGraphics = (
   activeLayer?: string,
 ): GraphicsObject => {
   const connections = getCanonicalConnections(input)
-  const layerByConnection = state.layerByConnection
   const breakoutPoints = state.breakoutPoints.filter(
-    (point) =>
-      !activeLayer || layerByConnection[point.connectionId] === activeLayer,
+    (point) => !activeLayer || point.layer === activeLayer,
   )
   const sharedGateSlots = new Map<
     string,
@@ -33,20 +30,19 @@ export const createStateGraphics = (
       y: point.y,
       layers: new Set<string>(),
     }
-    const layer = layerByConnection[point.connectionId]
-    if (layer) slot.layers.add(layer)
+    slot.layers.add(point.layer)
     sharedGateSlots.set(key, slot)
   }
   const guideLines = state.referenceOrder.flatMap((connectionId) => {
     const connection = connections.find(
       (candidate) => candidate.id === connectionId,
     )
-    const layer = layerByConnection[connectionId]
-    if (!connection || !layer || (activeLayer && layer !== activeLayer))
-      return []
+    if (!connection) return []
     const connectionBreakouts = breakoutPoints.filter(
       (point) => point.connectionId === connectionId,
     )
+    const layer = connectionBreakouts[0]?.layer
+    if (!layer || (activeLayer && layer !== activeLayer)) return []
     if (connectionBreakouts.length !== input.regions.length) return []
     const points = input.regions.flatMap((region, regionIndex) => {
       const endpoint = connection.endpoints.find(
@@ -91,8 +87,8 @@ export const createStateGraphics = (
       x: point.x,
       y: point.y,
       color: getConnectionColor(point.connectionId),
-      label: `${point.connectionId} · ${layerByConnection[point.connectionId]}`,
-      layer: getGraphicsLayer(input, [layerByConnection[point.connectionId]!]),
+      label: `${point.connectionId} · ${point.layer}`,
+      layer: getGraphicsLayer(input, [point.layer]),
     })),
   }
 }

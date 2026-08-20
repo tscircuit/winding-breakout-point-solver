@@ -50,10 +50,11 @@ test("output returns coordinates and the solver-selected connection layers", () 
   const input = cloneInput(ddrByte0Example)
   const output = solveSuccessfully(input)
 
-  expect(Object.keys(output)).toEqual(["breakoutPoints", "layerByConnection"])
+  expect(Object.keys(output)).toEqual(["breakoutPoints"])
   for (const point of output.breakoutPoints) {
     expect(Object.keys(point).sort()).toEqual([
       "connectionId",
+      "layer",
       "regionId",
       "x",
       "y",
@@ -154,15 +155,20 @@ test("differential pairs remain atomic on their selected layer", () => {
   )!
   const output = solveSuccessfully(input)
   const pairIds = pair.connections.map((connection) => connection.id)
-  const pairLayer = output.layerByConnection[pairIds[0]!]!
-  expect(output.layerByConnection[pairIds[1]!]).toBe(pairLayer)
+  const pairPoints = output.breakoutPoints.filter((point) =>
+    pairIds.includes(point.connectionId),
+  )
+  const pairLayer = pairPoints.find(
+    (point) => point.connectionId === pairIds[0],
+  )!.layer
+  expect(new Set(pairPoints.map((point) => point.layer))).toEqual(
+    new Set([pairLayer]),
+  )
   for (const region of input.regions) {
     const vertical = region.edge === "left" || region.edge === "right"
     const order = output.breakoutPoints
       .filter(
-        (point) =>
-          point.regionId === region.id &&
-          output.layerByConnection[point.connectionId] === pairLayer,
+        (point) => point.regionId === region.id && point.layer === pairLayer,
       )
       .sort((first, second) => {
         if (vertical) return first.y - second.y
@@ -192,7 +198,7 @@ test("all AM62L and LPDDR4 examples solve successfully", () => {
 test("preferredLayers remain available for solver distribution", () => {
   const input = cloneInput(ddrByte0Example)
   const output = solveSuccessfully(input)
-  expect(new Set(Object.values(output.layerByConnection))).toEqual(
+  expect(new Set(output.breakoutPoints.map((point) => point.layer))).toEqual(
     new Set(["inner1", "inner4"]),
   )
 })
@@ -209,7 +215,7 @@ test("preferredLayer is a permanent assignment even when alternatives exist", ()
       },
     ],
   })
-  expect(new Set(Object.values(output.layerByConnection))).toEqual(
+  expect(new Set(output.breakoutPoints.map((point) => point.layer))).toEqual(
     new Set(["inner3"]),
   )
 })

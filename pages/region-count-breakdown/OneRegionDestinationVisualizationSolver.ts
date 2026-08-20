@@ -22,14 +22,20 @@ export class OneRegionDestinationVisualizationSolver extends WindingBreakoutSolv
     const connections = getCanonicalConnections(this.inputProblem)
     const placement = this.getStageOutput<GatePlacementResult>("gatePlacement")
     const candidateLayers = getLayerCandidatesByConnection(this.inputProblem)
-    const layerByConnection =
-      placement?.layerByConnection ??
-      Object.fromEntries(
-        Object.entries(candidateLayers).map(([connectionId, layers]) => [
-          connectionId,
-          layers[0]!,
+    let layerByConnection = Object.fromEntries(
+      Object.entries(candidateLayers).map(([connectionId, layers]) => [
+        connectionId,
+        layers[0]!,
+      ]),
+    )
+    if (placement) {
+      layerByConnection = Object.fromEntries(
+        placement.breakoutPoints.map((point) => [
+          point.connectionId,
+          point.layer,
         ]),
       )
+    }
     const visibleDestinations = oneRegionExternalDestinations.filter(
       (destination) => {
         const connection = connections.find(

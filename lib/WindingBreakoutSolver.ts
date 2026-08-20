@@ -168,7 +168,6 @@ export class WindingBreakoutSolver extends BasePipelineSolver<WindingBreakoutSol
       state: {
         referenceOrder: ordering.referenceOrder,
         breakoutPoints: this.output.breakoutPoints,
-        layerByConnection: this.output.layerByConnection,
       },
     })
   }

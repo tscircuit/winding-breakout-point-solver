@@ -11,12 +11,10 @@ export const finalizeWindingBreakoutOutput = ({
   validated: ValidatedWindingInput
   placement: GatePlacementResult
 }): WindingBreakoutOutput => {
-  const { layerByConnection } = placement
   const valid = validateBreakoutPoints({
     points: placement.breakoutPoints,
     connectionIds: validated.connections.map((connection) => connection.id),
     regions: validated.regions,
-    layerByConnection,
     atomicGroups: validated.atomicConnectionGroups,
   })
   if (!valid) {
@@ -24,5 +22,5 @@ export const finalizeWindingBreakoutOutput = ({
       "WindingBreakoutSolver: generated invalid breakout points",
     )
   }
-  return { breakoutPoints: placement.breakoutPoints, layerByConnection }
+  return { breakoutPoints: placement.breakoutPoints }
 }

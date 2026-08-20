@@ -68,23 +68,22 @@ derived by the solver and are not accepted as input.
 
 ## Output API
 
-The successful result contains only the calculated coordinates and the two
-join keys needed to associate each point with the input:
+The successful result contains the calculated coordinates, selected layer, and
+the two join keys needed to associate each point with the input:
 
 ```ts
 type WindingBreakoutOutput = {
   breakoutPoints: readonly {
     regionId: string
     connectionId: string
+    layer: string
     x: number
     y: number
   }[]
-  layerByConnection: Readonly<Record<string, string>>
 }
 ```
 
-The selected layer is returned once per connection instead of being copied onto
-every regional point.
+Each regional point carries the solver-selected layer for its connection.
 Successful `getOutput()` already proves that the solver completed and its
 invariants passed, so the result does not repeat a `solved` flag or validation
 report. Reference/natural orders, slot indexes, layer offsets, layer/region

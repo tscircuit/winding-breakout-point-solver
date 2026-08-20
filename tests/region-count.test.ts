@@ -62,15 +62,21 @@ for (const [label, example] of examples) {
       if (!("type" in entry)) continue
       const pair = entry as DifferentialPairInput
       const pairIds = pair.connections.map((connection) => connection.id)
-      const pairLayer = output.layerByConnection[pairIds[0]!]!
-      expect(output.layerByConnection[pairIds[1]!]).toBe(pairLayer)
+      const pairPoints = output.breakoutPoints.filter((point) =>
+        pairIds.includes(point.connectionId),
+      )
+      const pairLayer = pairPoints.find(
+        (point) => point.connectionId === pairIds[0],
+      )!.layer
+      expect(new Set(pairPoints.map((point) => point.layer))).toEqual(
+        new Set([pairLayer]),
+      )
       for (const region of input.regions) {
         const vertical = region.edge === "left" || region.edge === "right"
         const order = output.breakoutPoints
           .filter(
             (point) =>
-              point.regionId === region.id &&
-              output.layerByConnection[point.connectionId] === pairLayer,
+              point.regionId === region.id && point.layer === pairLayer,
           )
           .sort((first, second) => {
             if (vertical) return first.y - second.y
