@@ -1,6 +1,7 @@
 import type { GraphicsObject } from "graphics-debug"
 import { getLayerNames } from "../get-layer-names"
 import { getCanonicalConnections } from "../input/get-canonical-connections"
+import { getLayerCandidatesByConnection } from "../input/get-bus-layer-candidates"
 import type { WindingBreakoutSolverInput } from "../types"
 import { createInputGraphics } from "./create-input-graphics"
 import {
@@ -69,12 +70,18 @@ export const createSolverPhaseVisualization = ({
       input.regions.find((region) => region.id === referenceRegionId) ??
       input.regions[0]!
     const connections = getCanonicalConnections(input)
+    const layerCandidatesByConnection = getLayerCandidatesByConnection(input)
     const orderedPositions: Array<{ x: number; y: number }> = []
     for (const [index, connectionId] of referenceOrder.entries()) {
       const connection = connections.find(
         (candidate) => candidate.id === connectionId,
       )
-      if (!connection || (activeLayer && connection.layer !== activeLayer)) {
+      const layerCandidates = layerCandidatesByConnection[connectionId]
+      if (
+        !connection ||
+        !layerCandidates ||
+        (activeLayer && !layerCandidates.includes(activeLayer))
+      ) {
         continue
       }
       const endpoint = connection.endpoints.find(
@@ -89,7 +96,7 @@ export const createSolverPhaseVisualization = ({
         anchorSide: "bottom_left",
         color: getConnectionColor(connectionId),
         fontSize: 0.21,
-        layer: getGraphicsLayer(input, [connection.layer]),
+        layer: getGraphicsLayer(input, layerCandidates),
       })
     }
     const center = {

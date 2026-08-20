@@ -1,5 +1,6 @@
 import type { GraphicsObject } from "graphics-debug"
 import { getLayerNames } from "../get-layer-names"
+import { getLayerCandidatesByConnection } from "../input/get-bus-layer-candidates"
 import { getCanonicalConnections } from "../input/get-canonical-connections"
 import type { WindingBreakoutSolverInput } from "../types"
 import { getConnectionColor } from "./get-connection-color"
@@ -22,6 +23,7 @@ export const createInputGraphics = (
   if (activeLayer) displayedLayers = [activeLayer]
   const visibleLayers = getGraphicsLayer(input, displayedLayers)
   const connections = getCanonicalConnections(input)
+  const layerCandidatesByConnection = getLayerCandidatesByConnection(input)
   const endpointRadius = Math.min(0.12, input.boundaryPointSpacing / 4)
 
   for (const region of input.regions) {
@@ -38,7 +40,8 @@ export const createInputGraphics = (
       layer: visibleLayers,
     })
     for (const connection of connections) {
-      if (activeLayer && connection.layer !== activeLayer) continue
+      const layerCandidates = layerCandidatesByConnection[connection.id]!
+      if (activeLayer && !layerCandidates.includes(activeLayer)) continue
       const endpoint = connection.endpoints.find(
         (candidate) => candidate.regionId === region.id,
       )
@@ -49,7 +52,7 @@ export const createInputGraphics = (
         radius: endpointRadius,
         fill: `${color}70`,
         stroke: color,
-        layer: getGraphicsLayer(input, [connection.layer]),
+        layer: getGraphicsLayer(input, layerCandidates),
       })
     }
     graphics.texts.push({

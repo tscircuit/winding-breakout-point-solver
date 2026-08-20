@@ -12,9 +12,15 @@ interface PortPair {
   readonly ram: { readonly x: number; readonly y: number }
 }
 
-interface ExampleOptions {
+interface ExampleBusOptions {
+  readonly id: string
   readonly ports: readonly PortPair[]
-  readonly useFullLayers?: boolean
+  readonly preferredLayer?: string
+  readonly preferredLayers?: readonly string[]
+}
+
+interface ExampleOptions {
+  readonly buses: readonly ExampleBusOptions[]
 }
 
 export const DDR_BYTE0_PORTS: readonly PortPair[] = [
@@ -252,29 +258,24 @@ export const DDR_ADDR_CTRL_PORTS: readonly PortPair[] = [
 export const createAm62lExample = (
   options: ExampleOptions,
 ): WindingBreakoutSolverInput => {
+  const ports = options.buses.flatMap((bus) => bus.ports)
   const addedPairIds = new Set<string>()
-  const getLayer = (port: PortPair): string => {
-    if (!options.useFullLayers) return port.layer
-    if (port.fullLayer !== undefined) return port.fullLayer
-    return port.layer
-  }
   const makeEndpoints = (port: PortPair) => [
     { regionId: "soc", position: port.soc },
     { regionId: "ram", position: port.ram },
   ]
   const connections: ConnectionOrDifferentialPair[] = []
-  for (const port of options.ports) {
+  for (const port of ports) {
     if (!port.differentialPairId) {
       connections.push({
         id: port.id,
-        layer: getLayer(port),
         endpoints: makeEndpoints(port),
       })
       continue
     }
     if (addedPairIds.has(port.differentialPairId)) continue
     addedPairIds.add(port.differentialPairId)
-    const pair = options.ports.filter(
+    const pair = ports.filter(
       (candidate) => candidate.differentialPairId === port.differentialPairId,
     )
     if (pair.length !== 2) {
@@ -283,13 +284,8 @@ export const createAm62lExample = (
       )
     }
     const [first, second] = pair as [PortPair, PortPair]
-    const layer = getLayer(first)
-    if (getLayer(second) !== layer) {
-      throw new Error(`Differential pair ${first.id}/${second.id} spans layers`)
-    }
     connections.push({
       type: "differential",
-      layer,
       connections: [
         { id: first.id, endpoints: makeEndpoints(first) },
         { id: second.id, endpoints: makeEndpoints(second) },
@@ -321,6 +317,16 @@ export const createAm62lExample = (
       },
     ],
     connections,
+    buses: options.buses.map((bus) => ({
+      id: bus.id,
+      connectionIds: bus.ports.map((port) => port.id),
+      ...(bus.preferredLayer !== undefined
+        ? { preferredLayer: bus.preferredLayer }
+        : {}),
+      ...(bus.preferredLayers !== undefined
+        ? { preferredLayers: bus.preferredLayers }
+        : {}),
+    })),
     boundaryPointSpacing: 0.48,
   }
 }

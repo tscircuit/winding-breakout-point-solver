@@ -6,6 +6,7 @@ import {
 } from "../gate-placement/place-breakout-gates"
 import { WindingBreakoutInvariantError } from "../input/errors"
 import type { ValidatedWindingInput } from "../input/validate-winding-breakout-input"
+import { assignConnectionLayers } from "../layer-assignment/assign-connection-layers"
 import type { BreakoutPoint, WindingBreakoutSolverInput } from "../types"
 import { createSolverPhaseVisualization } from "../visualization/create-solver-phase-visualization"
 import type { WindingBreakoutVisualizationState } from "../visualization/create-state-graphics"
@@ -42,14 +43,13 @@ export class GatePlacementSolver extends BaseSolver {
   constructor(private readonly params: GatePlacementSolverParams) {
     super()
     this.visualizationLayer = params.visualizationLayer
-    this.layerByConnection = Object.fromEntries(
-      params.validated.connections.map((connection) => [
-        connection.id,
-        connection.layer,
-      ]),
-    )
+    const assignment = assignConnectionLayers({
+      validated: params.validated,
+      referenceOrder: params.ordering.referenceOrder,
+    })
+    this.layerByConnection = assignment.layerByConnection
     this.placementBatches = params.validated.regions.flatMap((region) =>
-      params.validated.layerNames.map((layer) => ({
+      assignment.layerNames.map((layer) => ({
         regionId: region.id,
         layer,
       })),
@@ -67,7 +67,10 @@ export class GatePlacementSolver extends BaseSolver {
         regions: this.params.validated.regions,
         connections: this.params.validated.connections,
         referenceOrder: this.params.ordering.referenceOrder,
-        layerNames: this.params.validated.layerNames,
+        layerNames: [...new Set(Object.values(this.layerByConnection))].sort(
+          (first, second) => first.localeCompare(second),
+        ),
+        layerByConnection: this.layerByConnection,
         boundaryPointSpacing: this.params.input.boundaryPointSpacing,
         atomicGroups: this.params.validated.atomicConnectionGroups,
       })
@@ -150,6 +153,7 @@ export class GatePlacementSolver extends BaseSolver {
       visualizationState = {
         referenceOrder: this.params.ordering.referenceOrder,
         breakoutPoints,
+        layerByConnection: this.layerByConnection,
       }
     }
     const graphics = createSolverPhaseVisualization({

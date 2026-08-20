@@ -46,11 +46,11 @@ test("zero regions fail validation", () => {
   )
 })
 
-test("output does not repeat caller-owned layers or derived placement data", () => {
+test("output returns coordinates and the solver-selected connection layers", () => {
   const input = cloneInput(ddrByte0Example)
   const output = solveSuccessfully(input)
 
-  expect(Object.keys(output)).toEqual(["breakoutPoints"])
+  expect(Object.keys(output)).toEqual(["breakoutPoints", "layerByConnection"])
   for (const point of output.breakoutPoints) {
     expect(Object.keys(point).sort()).toEqual([
       "connectionId",
@@ -146,25 +146,23 @@ test("invalid differential pairs fail validation", () => {
   )
 })
 
-test("differential pairs remain atomic on their declared layer", () => {
+test("differential pairs remain atomic on their selected layer", () => {
   const input = cloneInput(ddrByte0Example)
-  const canonicalConnections = getCanonicalConnections(input)
-  const layerByConnection = new Map(
-    canonicalConnections.map((connection) => [connection.id, connection.layer]),
-  )
   const pair = input.connections.find(
     (connection): connection is DifferentialPairInput =>
       "type" in connection && connection.type === "differential",
   )!
   const output = solveSuccessfully(input)
   const pairIds = pair.connections.map((connection) => connection.id)
+  const pairLayer = output.layerByConnection[pairIds[0]!]!
+  expect(output.layerByConnection[pairIds[1]!]).toBe(pairLayer)
   for (const region of input.regions) {
     const vertical = region.edge === "left" || region.edge === "right"
     const order = output.breakoutPoints
       .filter(
         (point) =>
           point.regionId === region.id &&
-          layerByConnection.get(point.connectionId) === pair.layer,
+          output.layerByConnection[point.connectionId] === pairLayer,
       )
       .sort((first, second) =>
         vertical ? first.y - second.y : first.x - second.x,
@@ -188,4 +186,29 @@ test("all AM62L and LPDDR4 examples solve successfully", () => {
       getCanonicalConnections(input).length * input.regions.length,
     )
   }
+})
+
+test("preferredLayers remain available for solver distribution", () => {
+  const input = cloneInput(ddrByte0Example)
+  const output = solveSuccessfully(input)
+  expect(new Set(Object.values(output.layerByConnection))).toEqual(
+    new Set(["inner1", "inner4"]),
+  )
+})
+
+test("preferredLayer is a permanent assignment even when alternatives exist", () => {
+  const input = cloneInput(ddrByte0Example)
+  const output = solveSuccessfully({
+    ...input,
+    buses: [
+      {
+        ...input.buses[0]!,
+        preferredLayer: "inner3",
+        preferredLayers: ["inner1", "inner4"],
+      },
+    ],
+  })
+  expect(new Set(Object.values(output.layerByConnection))).toEqual(
+    new Set(["inner3"]),
+  )
 })

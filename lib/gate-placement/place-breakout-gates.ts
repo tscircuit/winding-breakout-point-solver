@@ -9,6 +9,7 @@ const GEOMETRY_EPSILON = 1e-9
 
 export interface GatePlacementResult {
   readonly breakoutPoints: readonly BreakoutPoint[]
+  readonly layerByConnection: Readonly<Record<string, string>>
 }
 
 const isVerticalEdge = (edge: ValidatedRegion["edge"]): boolean =>
@@ -163,6 +164,7 @@ export const placeBreakoutGates = ({
   connections,
   referenceOrder,
   layerNames,
+  layerByConnection,
   boundaryPointSpacing,
   atomicGroups,
 }: {
@@ -170,12 +172,10 @@ export const placeBreakoutGates = ({
   connections: readonly ValidatedConnection[]
   referenceOrder: readonly string[]
   layerNames: readonly string[]
+  layerByConnection: Readonly<Record<string, string>>
   boundaryPointSpacing: number
   atomicGroups: readonly (readonly [string, string])[]
 }): GatePlacementResult => {
-  const layerByConnection = Object.fromEntries(
-    connections.map((connection) => [connection.id, connection.layer]),
-  )
   const layerOffsets = deriveLayerOffsets(layerNames, boundaryPointSpacing)
   const gateOrderByLayer = Object.fromEntries(
     layerNames.map((layer) => [
@@ -191,7 +191,9 @@ export const placeBreakoutGates = ({
   const maxLayerNetCount = Math.max(
     ...layerNames.map(
       (layer) =>
-        connections.filter((connection) => connection.layer === layer).length,
+        connections.filter(
+          (connection) => layerByConnection[connection.id] === layer,
+        ).length,
     ),
   )
   const { vertical, axes } = makeGateAxes({
@@ -214,5 +216,5 @@ export const placeBreakoutGates = ({
       })),
     ),
   )
-  return { breakoutPoints }
+  return { breakoutPoints, layerByConnection }
 }

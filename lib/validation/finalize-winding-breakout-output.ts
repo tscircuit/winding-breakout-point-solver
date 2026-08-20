@@ -11,12 +11,7 @@ export const finalizeWindingBreakoutOutput = ({
   validated: ValidatedWindingInput
   placement: GatePlacementResult
 }): WindingBreakoutOutput => {
-  const layerByConnection = Object.fromEntries(
-    validated.connections.map((connection) => [
-      connection.id,
-      connection.layer,
-    ]),
-  )
+  const { layerByConnection } = placement
   const valid = validateBreakoutPoints({
     points: placement.breakoutPoints,
     connectionIds: validated.connections.map((connection) => connection.id),
@@ -29,5 +24,5 @@ export const finalizeWindingBreakoutOutput = ({
       "WindingBreakoutSolver: generated invalid breakout points",
     )
   }
-  return { breakoutPoints: placement.breakoutPoints }
+  return { breakoutPoints: placement.breakoutPoints, layerByConnection }
 }

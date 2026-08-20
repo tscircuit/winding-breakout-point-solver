@@ -1,16 +1,17 @@
 # @tscircuit/winding-breakout-point-solver
 
 A typed, deterministic solver for placing winding-aware breakout points on one
-or more declared region boundaries. The caller declares every connection once, including
-its layer and one endpoint per region. The solver derives winding order and
-staggered boundary points; it does not generate traces, dogbones, or vias.
+or more declared region boundaries. The caller declares every connection once,
+one endpoint per region, and the buses that constrain layer assignment. The
+solver derives winding order, selected layers, and staggered boundary points;
+it does not generate traces, dogbones, or vias.
 
 The package is currently private.
 
 ## Input API
 
-`connections` is the single source of truth for connection IDs, layers, and
-endpoint positions.
+`connections` is the single source of truth for connection IDs and endpoint
+positions. `buses` carries routing-group membership and layer constraints.
 
 ```ts
 type WindingBreakoutSolverInput = {
@@ -20,12 +21,12 @@ type WindingBreakoutSolverInput = {
     edge: "left" | "right" | "bottom" | "top"
   }[]
   connections: readonly ConnectionOrDifferentialPair[]
+  buses: readonly WindingBreakoutBusInput[]
   boundaryPointSpacing: number
 }
 
 type ConnectionInput = {
   id: string
-  layer: string
   endpoints: readonly {
     regionId: string
     position: Point
@@ -34,18 +35,23 @@ type ConnectionInput = {
 
 type DifferentialPairInput = {
   type: "differential"
-  layer: string
-  connections: readonly [
-    Omit<ConnectionInput, "layer">,
-    Omit<ConnectionInput, "layer">,
-  ]
+  connections: readonly [ConnectionInput, ConnectionInput]
+}
+
+type WindingBreakoutBusInput = {
+  id: string
+  connectionIds: readonly string[]
+  preferredLayer?: string
+  preferredLayers?: readonly string[]
 }
 ```
 
 At least one region is required. Every connection must have exactly one endpoint
 for every declared region.
-Differential-pair members inherit the pair's layer and remain adjacent in the
-breakout order.
+Differential-pair members must belong to the same bus, select the same layer,
+and remain adjacent in the breakout order. Despite its legacy name,
+`preferredLayer` is a permanent assignment. `preferredLayers` is the ordered
+candidate set that the solver may distribute a bus over.
 
 Every input field carries caller-owned information:
 
@@ -53,8 +59,8 @@ Every input field carries caller-owned information:
 - bounds and the selected edge define the allowed breakout geometry;
 - endpoint region IDs make the join explicit instead of coupling two arrays by
   position;
-- endpoint positions define the winding, while connection layers and
-  differential-pair membership are routing constraints; and
+- endpoint positions define the winding, while buses and differential-pair
+  membership are routing constraints; and
 - `boundaryPointSpacing` is the requested physical spacing.
 
 Region centers, the layer list, winding orders, and layer stagger offsets are
@@ -73,10 +79,12 @@ type WindingBreakoutOutput = {
     x: number
     y: number
   }[]
+  layerByConnection: Readonly<Record<string, string>>
 }
 ```
 
-Layers remain owned by `connections` and are not copied onto every point.
+The selected layer is returned once per connection instead of being copied onto
+every regional point.
 Successful `getOutput()` already proves that the solver completed and its
 invariants passed, so the result does not repeat a `solved` flag or validation
 report. Reference/natural orders, slot indexes, layer offsets, layer/region
@@ -107,7 +115,6 @@ const input = {
   connections: [
     {
       id: "DQ0",
-      layer: "inner1",
       endpoints: [
         { regionId: "source", position: { x: -5, y: -0.5 } },
         { regionId: "target", position: { x: 5, y: 0.5 } },
@@ -115,7 +122,6 @@ const input = {
     },
     {
       type: "differential",
-      layer: "inner2",
       connections: [
         {
           id: "DQS0",
@@ -134,6 +140,18 @@ const input = {
       ],
     },
   ],
+  buses: [
+    {
+      id: "data",
+      connectionIds: ["DQ0"],
+      preferredLayer: "inner1",
+    },
+    {
+      id: "strobe",
+      connectionIds: ["DQS0", "DQS0_n"],
+      preferredLayers: ["inner2", "inner3"],
+    },
+  ],
   boundaryPointSpacing: 0.48,
 } satisfies WindingBreakoutSolverInput
 
@@ -148,7 +166,8 @@ const graphics = solver.visualize()
 
 The solver derives each region center from its bounds, uses the first region's
 endpoint geometry as the reference winding, and derives its layer stagger as
-`boundaryPointSpacing / 2`. It never changes a declared connection layer.
+`boundaryPointSpacing / 2`. Buses are kept contiguous; fixed buses remain on
+`preferredLayer`, while flexible buses are distributed over `preferredLayers`.
 
 `getOutput()` is unavailable until the solver completes successfully. Input
 validation runs during solver setup. The `BasePipelineSolver` then runs two
@@ -171,8 +190,8 @@ git diff --check
 ```
 
 The React Cosmos debugger renders region bounds, canonical endpoints, and
-calculated breakout points. Its layer selector is derived from the connection
-records. Start it with `bun run start`, then open **Region Count Breakdown** for
+calculated breakout points. Its layer selector is derived from bus preferences.
+Start it with `bun run start`, then open **Region Count Breakdown** for
 interactive one-, two-, and three-region examples. Each example exposes the
 two pipeline stages independently in the pipeline debugger. The one-region
 example also renders caller-owned destination points outside the region, making

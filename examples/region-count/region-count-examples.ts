@@ -75,17 +75,16 @@ const makeConnections = (
 
   // Deliberately not in geometric order: reference order must come from pads.
   return [
-    { id: "CTRL", layer: "inner1", endpoints: endpoints("CTRL") },
+    { id: "CTRL", endpoints: endpoints("CTRL") },
     {
       type: "differential",
-      layer: "inner2",
       connections: [
         { id: "CLK_P", endpoints: endpoints("CLK_P") },
         { id: "CLK_N", endpoints: endpoints("CLK_N") },
       ],
     },
-    { id: "DATA1", layer: "inner1", endpoints: endpoints("DATA1") },
-    { id: "DATA0", layer: "inner1", endpoints: endpoints("DATA0") },
+    { id: "DATA1", endpoints: endpoints("DATA1") },
+    { id: "DATA0", endpoints: endpoints("DATA0") },
   ]
 }
 
@@ -94,6 +93,18 @@ const makeExample = (
 ): WindingBreakoutSolverInput => ({
   regions: regionIds.map((regionId) => regionCatalog[regionId]),
   connections: makeConnections(regionIds),
+  buses: [
+    {
+      id: "data-control",
+      connectionIds: ["DATA0", "CTRL", "DATA1"],
+      preferredLayer: "inner1",
+    },
+    {
+      id: "clock",
+      connectionIds: ["CLK_P", "CLK_N"],
+      preferredLayer: "inner2",
+    },
+  ],
   boundaryPointSpacing: 0.5,
 })
 

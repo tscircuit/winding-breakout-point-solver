@@ -42,12 +42,6 @@ for (const [label, example] of examples) {
     const input = cloneInput(example)
     const canonicalConnections = getCanonicalConnections(input)
     const output = solveSuccessfully(input)
-    const layerByConnection = new Map(
-      canonicalConnections.map((connection) => [
-        connection.id,
-        connection.layer,
-      ]),
-    )
 
     expect(output.breakoutPoints).toHaveLength(
       canonicalConnections.length * input.regions.length,
@@ -68,13 +62,15 @@ for (const [label, example] of examples) {
       if (!("type" in entry)) continue
       const pair = entry as DifferentialPairInput
       const pairIds = pair.connections.map((connection) => connection.id)
+      const pairLayer = output.layerByConnection[pairIds[0]!]!
+      expect(output.layerByConnection[pairIds[1]!]).toBe(pairLayer)
       for (const region of input.regions) {
         const vertical = region.edge === "left" || region.edge === "right"
         const order = output.breakoutPoints
           .filter(
             (point) =>
               point.regionId === region.id &&
-              layerByConnection.get(point.connectionId) === pair.layer,
+              output.layerByConnection[point.connectionId] === pairLayer,
           )
           .sort((first, second) =>
             vertical ? first.y - second.y : first.x - second.x,

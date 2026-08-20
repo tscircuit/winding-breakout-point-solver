@@ -25,5 +25,6 @@ export const oneMillimeterPaddingInput: WindingBreakoutSolverInput = {
     },
   ],
   connections: fullDdrExample.connections,
+  buses: fullDdrExample.buses,
   boundaryPointSpacing: fullDdrExample.boundaryPointSpacing,
 }

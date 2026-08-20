@@ -8,6 +8,7 @@ import { getGraphicsLayer } from "./get-graphics-layer"
 export interface WindingBreakoutVisualizationState {
   readonly referenceOrder: readonly string[]
   readonly breakoutPoints: readonly BreakoutPoint[]
+  readonly layerByConnection: Readonly<Record<string, string>>
 }
 
 export const createStateGraphics = (
@@ -16,12 +17,10 @@ export const createStateGraphics = (
   activeLayer?: string,
 ): GraphicsObject => {
   const connections = getCanonicalConnections(input)
-  const layerByConnection = new Map(
-    connections.map((connection) => [connection.id, connection.layer]),
-  )
+  const layerByConnection = state.layerByConnection
   const breakoutPoints = state.breakoutPoints.filter(
     (point) =>
-      !activeLayer || layerByConnection.get(point.connectionId) === activeLayer,
+      !activeLayer || layerByConnection[point.connectionId] === activeLayer,
   )
   const sharedGateSlots = new Map<
     string,
@@ -34,7 +33,7 @@ export const createStateGraphics = (
       y: point.y,
       layers: new Set<string>(),
     }
-    const layer = layerByConnection.get(point.connectionId)
+    const layer = layerByConnection[point.connectionId]
     if (layer) slot.layers.add(layer)
     sharedGateSlots.set(key, slot)
   }
@@ -42,7 +41,8 @@ export const createStateGraphics = (
     const connection = connections.find(
       (candidate) => candidate.id === connectionId,
     )
-    if (!connection || (activeLayer && connection.layer !== activeLayer))
+    const layer = layerByConnection[connectionId]
+    if (!connection || !layer || (activeLayer && layer !== activeLayer))
       return []
     const connectionBreakouts = breakoutPoints.filter(
       (point) => point.connectionId === connectionId,
@@ -66,7 +66,7 @@ export const createStateGraphics = (
         strokeColor: `${getConnectionColor(connectionId)}55`,
         strokeWidth: 0.012,
         strokeDash: [0.025, 0.07],
-        layer: getGraphicsLayer(input, [connection.layer]),
+        layer: getGraphicsLayer(input, [layer]),
       },
     ]
   })
@@ -91,10 +91,8 @@ export const createStateGraphics = (
       x: point.x,
       y: point.y,
       color: getConnectionColor(point.connectionId),
-      label: `${point.connectionId} · ${layerByConnection.get(point.connectionId)}`,
-      layer: getGraphicsLayer(input, [
-        layerByConnection.get(point.connectionId)!,
-      ]),
+      label: `${point.connectionId} · ${layerByConnection[point.connectionId]}`,
+      layer: getGraphicsLayer(input, [layerByConnection[point.connectionId]!]),
     })),
   }
 }
