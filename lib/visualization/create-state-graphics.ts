@@ -1,6 +1,6 @@
 import type { GraphicsObject } from "graphics-debug"
+import { getCanonicalConnections } from "../input/get-canonical-connections"
 import type {
-  WindingBreakoutDiagnosticOutput,
   WindingBreakoutOutput,
   WindingBreakoutSolverInput,
 } from "../types"
@@ -10,41 +10,42 @@ import { getGraphicsLayer } from "./get-graphics-layer"
 /** Draw only the calculated breakout points; this solver does not route. */
 export const createStateGraphics = (
   input: WindingBreakoutSolverInput,
-  state: WindingBreakoutOutput | WindingBreakoutDiagnosticOutput,
+  state: WindingBreakoutOutput,
   activeLayer?: string,
 ): GraphicsObject => {
-  const diagnostic = state.solved === false
+  const connections = getCanonicalConnections(input)
   const breakoutPoints = state.breakoutPoints.filter(
     (point) => !activeLayer || point.layer === activeLayer,
   )
   const guideLines = state.referenceOrder.flatMap((connectionId) => {
+    const connection = connections.find(
+      (candidate) => candidate.id === connectionId,
+    )
+    if (!connection || (activeLayer && connection.layer !== activeLayer))
+      return []
     const connectionBreakouts = breakoutPoints.filter(
       (point) => point.connectionId === connectionId,
     )
     if (connectionBreakouts.length !== input.regions.length) return []
     const points = input.regions.flatMap((region, regionIndex) => {
-      const port = region.ports.find(
-        (candidate) => candidate.connectionId === connectionId,
+      const endpoint = connection.endpoints.find(
+        (candidate) => candidate.regionId === region.id,
       )
       const breakout = connectionBreakouts.find(
         (candidate) => candidate.regionId === region.id,
       )
-      if (!port || !breakout) return []
-      return regionIndex === 0
-        ? [port.position, breakout]
-        : [breakout, port.position]
+      if (!endpoint || !breakout) return []
+      if (regionIndex === 0) return [endpoint.position, breakout]
+      return [breakout, endpoint.position]
     })
     if (points.length < 4) return []
-    const layer = connectionBreakouts[0]!.layer
     return [
       {
         points,
-        strokeColor: diagnostic
-          ? "rgba(220, 38, 38, 0.32)"
-          : `${getConnectionColor(connectionId)}55`,
+        strokeColor: `${getConnectionColor(connectionId)}55`,
         strokeWidth: 0.012,
         strokeDash: [0.025, 0.07],
-        layer: getGraphicsLayer(input, [layer]),
+        layer: getGraphicsLayer(input, [connection.layer]),
       },
     ]
   })
@@ -59,10 +60,8 @@ export const createStateGraphics = (
         {
           center: slot,
           radius: 0.11,
-          fill: diagnostic
-            ? "rgba(220, 38, 38, 0.12)"
-            : "rgba(15, 23, 42, 0.06)",
-          stroke: diagnostic ? "#dc2626" : "#475569",
+          fill: "rgba(15, 23, 42, 0.06)",
+          stroke: "#475569",
           layer: getGraphicsLayer(input, layers),
         },
       ]
@@ -70,7 +69,7 @@ export const createStateGraphics = (
     points: breakoutPoints.map((point) => ({
       x: point.x,
       y: point.y,
-      color: diagnostic ? "#dc2626" : getConnectionColor(point.connectionId),
+      color: getConnectionColor(point.connectionId),
       label: `${point.connectionId} · ${point.layer}`,
       layer: getGraphicsLayer(input, [point.layer]),
     })),

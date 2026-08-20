@@ -1,64 +1,53 @@
 import { WindingBreakoutInfeasibleError } from "../input/errors"
-import { hasSolidPlaneBetween } from "../layer-assignment/stackup-relationships"
 import type {
-  BreakoutBand,
-  BreakoutPoint,
-  SharedGateSlot,
-  StackupEntry,
-  WindingBreakoutRegion,
-} from "../types"
+  ValidatedConnection,
+  ValidatedRegion,
+} from "../input/validate-winding-breakout-input"
+import type { BreakoutPoint, SharedGateSlot } from "../types"
 
 const GEOMETRY_EPSILON = 1e-9
 
 export interface GatePlacementResult {
-  readonly gateOrderByRegion: Readonly<Record<string, readonly string[]>>
   readonly gateOrderByLayerByRegion: Readonly<
     Record<string, Readonly<Record<string, readonly string[]>>>
   >
-  readonly layerNetCounts: Readonly<Record<string, number>>
   readonly layerOffsets: Readonly<Record<string, number>>
-  readonly maxLayerNetCount: number
   readonly breakoutPoints: readonly BreakoutPoint[]
   readonly sharedGateSlots: readonly SharedGateSlot[]
 }
 
-const isVerticalEdge = (edge: WindingBreakoutRegion["edge"]): boolean =>
+const isVerticalEdge = (edge: ValidatedRegion["edge"]): boolean =>
   edge === "left" || edge === "right"
 
-const deriveLayerOffsets = ({
-  layerNames,
-  stackup,
-  explicitOffsets,
-  staggerOffset,
-}: {
-  layerNames: readonly string[]
-  stackup: readonly StackupEntry[]
-  explicitOffsets?: Readonly<Record<string, number>>
-  staggerOffset: number
-}): Record<string, number> => {
-  if (explicitOffsets) {
-    return Object.fromEntries(
-      layerNames.map((layer) => [layer, explicitOffsets[layer] ?? 0]),
-    )
-  }
-  const groups: string[][] = []
-  let currentGroup: string[] = []
-  for (const entry of stackup) {
-    if (entry.type === "plane" && entry.solid) {
-      if (currentGroup.length > 0) groups.push(currentGroup)
-      currentGroup = []
-    } else if (entry.type === "signal" && layerNames.includes(entry.id)) {
-      currentGroup.push(entry.id)
-    }
-  }
-  if (currentGroup.length > 0) groups.push(currentGroup)
-  const offsets = Object.fromEntries(layerNames.map((layer) => [layer, 0]))
-  for (const group of groups) {
-    group.forEach((layer, index) => {
-      offsets[layer] = (index - (group.length - 1) / 2) * staggerOffset
-    })
-  }
-  return offsets
+const getAxisMinimum = (region: ValidatedRegion, vertical: boolean): number => {
+  if (vertical) return region.bounds.minY
+  return region.bounds.minX
+}
+
+const getAxisMaximum = (region: ValidatedRegion, vertical: boolean): number => {
+  if (vertical) return region.bounds.maxY
+  return region.bounds.maxX
+}
+
+const getAxisPosition = (
+  position: { readonly x: number; readonly y: number },
+  vertical: boolean,
+): number => {
+  if (vertical) return position.y
+  return position.x
+}
+
+const deriveLayerOffsets = (
+  layerNames: readonly string[],
+  boundaryPointSpacing: number,
+): Record<string, number> => {
+  const staggerOffset = boundaryPointSpacing / 2
+  return Object.fromEntries(
+    layerNames.map((layer, index) => [
+      layer,
+      (index - (layerNames.length - 1) / 2) * staggerOffset,
+    ]),
+  )
 }
 
 const makeAtomicLayerOrder = ({
@@ -70,7 +59,7 @@ const makeAtomicLayerOrder = ({
   referenceOrder: readonly string[]
   layer: string
   layerByConnection: Readonly<Record<string, string>>
-  atomicGroups: readonly (readonly string[])[]
+  atomicGroups: readonly (readonly [string, string])[]
 }): string[] => {
   const candidates = referenceOrder.filter(
     (connectionId) => layerByConnection[connectionId] === layer,
@@ -80,7 +69,7 @@ const makeAtomicLayerOrder = ({
       group.map((connectionId) => [connectionId, group] as const),
     ),
   )
-  const added = new Set<readonly string[]>()
+  const addedGroups = new Set<readonly [string, string]>()
   const result: string[] = []
   for (const connectionId of candidates) {
     const group = groupByConnection.get(connectionId)
@@ -88,8 +77,8 @@ const makeAtomicLayerOrder = ({
       result.push(connectionId)
       continue
     }
-    if (added.has(group)) continue
-    added.add(group)
+    if (addedGroups.has(group)) continue
+    addedGroups.add(group)
     result.push(...candidates.filter((candidate) => group.includes(candidate)))
   }
   return result
@@ -97,68 +86,49 @@ const makeAtomicLayerOrder = ({
 
 const makeGateAxes = ({
   regions,
-  band,
+  connections,
   spacing,
   count,
   layerOffsets,
-  allowBandOverflow,
 }: {
-  regions: readonly WindingBreakoutRegion[]
-  band: BreakoutBand
+  regions: readonly ValidatedRegion[]
+  connections: readonly ValidatedConnection[]
   spacing: number
   count: number
   layerOffsets: Readonly<Record<string, number>>
-  allowBandOverflow: boolean
 }): { vertical: boolean; axes: number[] } => {
   const vertical = regions.every((region) => isVerticalEdge(region.edge))
-  if (!vertical && !regions.every((region) => !isVerticalEdge(region.edge))) {
-    throw new WindingBreakoutInfeasibleError(
-      "WindingBreakoutSolver: all coordinated edges must be parallel",
-    )
-  }
-  let minAxis = Math.max(
-    band.min,
-    ...regions.map((region) =>
-      vertical ? region.bounds.minY : region.bounds.minX,
-    ),
+  const minAxis = Math.max(
+    ...regions.map((region) => getAxisMinimum(region, vertical)),
   )
-  let maxAxis = Math.min(
-    band.max,
-    ...regions.map((region) =>
-      vertical ? region.bounds.maxY : region.bounds.maxX,
-    ),
+  const maxAxis = Math.min(
+    ...regions.map((region) => getAxisMaximum(region, vertical)),
   )
   const minimumOffset = Math.min(...Object.values(layerOffsets))
   const maximumOffset = Math.max(...Object.values(layerOffsets))
   const span = spacing * Math.max(0, count - 1) + maximumOffset - minimumOffset
-  if (maxAxis - minAxis + GEOMETRY_EPSILON < span && allowBandOverflow) {
-    minAxis = Math.max(
-      ...regions.map((region) =>
-        vertical ? region.bounds.minY : region.bounds.minX,
-      ),
-    )
-    maxAxis = Math.min(
-      ...regions.map((region) =>
-        vertical ? region.bounds.maxY : region.bounds.maxX,
-      ),
-    )
-  }
   if (maxAxis - minAxis + GEOMETRY_EPSILON < span) {
     throw new WindingBreakoutInfeasibleError(
       `WindingBreakoutSolver: shared facing edges need ${span.toFixed(2)}mm but expose only ${(maxAxis - minAxis).toFixed(2)}mm`,
     )
   }
   const meanAxis =
-    regions.reduce(
-      (regionSum, region) =>
+    regions.reduce((regionSum, region) => {
+      const positions = connections.map(
+        (connection) =>
+          connection.endpoints.find(
+            (endpoint) => endpoint.regionId === region.id,
+          )!.position,
+      )
+      return (
         regionSum +
-        region.ports.reduce(
-          (sum, port) => sum + (vertical ? port.position.y : port.position.x),
+        positions.reduce(
+          (sum, position) => sum + getAxisPosition(position, vertical),
           0,
         ) /
-          region.ports.length,
-      0,
-    ) / regions.length
+          positions.length
+      )
+    }, 0) / regions.length
   const start = Math.max(
     minAxis - minimumOffset,
     Math.min(
@@ -173,43 +143,44 @@ const makeGateAxes = ({
 }
 
 const pointOnEdge = (
-  region: WindingBreakoutRegion,
+  region: ValidatedRegion,
   axis: number,
   vertical: boolean,
 ) => {
   if (vertical) {
+    let x = region.bounds.maxX
+    if (region.edge === "left") x = region.bounds.minX
     return {
-      x: region.edge === "left" ? region.bounds.minX : region.bounds.maxX,
+      x,
       y: axis,
     }
   }
+  let y = region.bounds.maxY
+  if (region.edge === "bottom") y = region.bounds.minY
   return {
     x: axis,
-    y: region.edge === "bottom" ? region.bounds.minY : region.bounds.maxY,
+    y,
   }
 }
 
 const groupSharedGateSlots = (
   points: readonly BreakoutPoint[],
-  stackup: readonly StackupEntry[],
 ): SharedGateSlot[] => {
   const groups = new Map<
     string,
     {
       id: string
       regionId: string
-      busId?: string
       x: number
       y: number
-      indicators: Array<{ connectionId: string; layer: string; busId?: string }>
+      indicators: Array<{ connectionId: string; layer: string }>
     }
   >()
   for (const point of points) {
-    const key = `${point.busId ?? "GLOBAL"}:${point.regionId}:${point.x.toFixed(9)}:${point.y.toFixed(9)}`
+    const key = `${point.regionId}:${point.x.toFixed(9)}:${point.y.toFixed(9)}`
     const group = groups.get(key) ?? {
       id: key,
       regionId: point.regionId,
-      ...(point.busId ? { busId: point.busId } : {}),
       x: point.x,
       y: point.y,
       indicators: [],
@@ -217,72 +188,31 @@ const groupSharedGateSlots = (
     group.indicators.push({
       connectionId: point.connectionId,
       layer: point.layer,
-      ...(point.busId ? { busId: point.busId } : {}),
     })
     groups.set(key, group)
   }
-  return [...groups.values()].map((group) => ({
-    ...group,
-    totalIndicatorCount: group.indicators.length,
-    reuseType:
-      group.indicators.length > 1 &&
-      group.indicators.every((first, firstIndex) =>
-        group.indicators.every(
-          (second, secondIndex) =>
-            firstIndex === secondIndex ||
-            hasSolidPlaneBetween(stackup, first.layer, second.layer),
-        ),
-      )
-        ? "plane-isolated"
-        : "staggered",
-  }))
+  return [...groups.values()]
 }
 
 export const placeBreakoutGates = ({
   regions,
-  busId,
-  band,
+  connections,
   referenceOrder,
-  naturalOrderByRegion,
-  preserveWinding,
   layerNames,
-  layerByConnection,
-  stackup,
   boundaryPointSpacing,
-  breakoutStaggerOffset,
-  layerBreakoutOffsets,
   atomicGroups,
-  allowBandOverflow,
 }: {
-  regions: readonly WindingBreakoutRegion[]
-  busId: string
-  band: BreakoutBand
+  regions: readonly ValidatedRegion[]
+  connections: readonly ValidatedConnection[]
   referenceOrder: readonly string[]
-  naturalOrderByRegion: Readonly<Record<string, readonly string[]>>
-  preserveWinding: boolean
   layerNames: readonly string[]
-  layerByConnection: Readonly<Record<string, string>>
-  stackup: readonly StackupEntry[]
   boundaryPointSpacing: number
-  breakoutStaggerOffset: number
-  layerBreakoutOffsets?: Readonly<Record<string, number>>
-  atomicGroups: readonly (readonly string[])[]
-  allowBandOverflow: boolean
+  atomicGroups: readonly (readonly [string, string])[]
 }): GatePlacementResult => {
-  const gateOrderByRegion = Object.fromEntries(
-    regions.map((region, index) => [
-      region.id,
-      index === 0 || preserveWinding
-        ? [...referenceOrder]
-        : [...naturalOrderByRegion[region.id]!],
-    ]),
+  const layerByConnection = Object.fromEntries(
+    connections.map((connection) => [connection.id, connection.layer]),
   )
-  const layerOffsets = deriveLayerOffsets({
-    layerNames,
-    stackup,
-    explicitOffsets: layerBreakoutOffsets,
-    staggerOffset: breakoutStaggerOffset,
-  })
+  const layerOffsets = deriveLayerOffsets(layerNames, boundaryPointSpacing)
   const gateOrderByLayerByRegion = Object.fromEntries(
     regions.map((region) => [
       region.id,
@@ -290,7 +220,7 @@ export const placeBreakoutGates = ({
         layerNames.map((layer) => [
           layer,
           makeAtomicLayerOrder({
-            referenceOrder: gateOrderByRegion[region.id]!,
+            referenceOrder,
             layer,
             layerByConnection,
             atomicGroups,
@@ -299,20 +229,18 @@ export const placeBreakoutGates = ({
       ),
     ]),
   )
-  const layerNetCounts = Object.fromEntries(
-    layerNames.map((layer) => [
-      layer,
-      referenceOrder.filter((id) => layerByConnection[id] === layer).length,
-    ]),
+  const maxLayerNetCount = Math.max(
+    ...layerNames.map(
+      (layer) =>
+        connections.filter((connection) => connection.layer === layer).length,
+    ),
   )
-  const maxLayerNetCount = Math.max(...Object.values(layerNetCounts))
   const { vertical, axes } = makeGateAxes({
     regions,
-    band,
+    connections,
     spacing: boundaryPointSpacing,
     count: maxLayerNetCount,
     layerOffsets,
-    allowBandOverflow,
   })
   const breakoutPoints = regions.flatMap((region) =>
     layerNames.flatMap((layer) =>
@@ -327,21 +255,15 @@ export const placeBreakoutGates = ({
             vertical,
           ),
           slotIndex,
-          orderIndex: slotIndex,
           layerOffset: layerOffsets[layer]!,
-          busId,
-          slotScope: `${busId}:${layer}:${slotIndex}`,
         }),
       ),
     ),
   )
   return {
-    gateOrderByRegion,
     gateOrderByLayerByRegion,
-    layerNetCounts,
     layerOffsets,
-    maxLayerNetCount,
     breakoutPoints,
-    sharedGateSlots: groupSharedGateSlots(breakoutPoints, stackup),
+    sharedGateSlots: groupSharedGateSlots(breakoutPoints),
   }
 }
