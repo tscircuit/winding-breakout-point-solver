@@ -2,6 +2,7 @@ import type { GraphicsObject } from "graphics-debug"
 import { oneRegionExternalDestinations } from "../../examples/region-count"
 import type { GatePlacementResult } from "../../lib/gate-placement/place-breakout-gates"
 import { getCanonicalConnections } from "../../lib/input/get-canonical-connections"
+import { getLayerCandidatesByConnection } from "../../lib/input/get-bus-layer-candidates"
 import { WindingBreakoutSolver } from "../../lib/WindingBreakoutSolver"
 import type { WindingBreakoutSolverInput } from "../../lib/types"
 import { getConnectionColor } from "../../lib/visualization/get-connection-color"
@@ -20,6 +21,21 @@ export class OneRegionDestinationVisualizationSolver extends WindingBreakoutSolv
     const base = super.visualize()
     const connections = getCanonicalConnections(this.inputProblem)
     const placement = this.getStageOutput<GatePlacementResult>("gatePlacement")
+    const candidateLayers = getLayerCandidatesByConnection(this.inputProblem)
+    let layerByConnection = Object.fromEntries(
+      Object.entries(candidateLayers).map(([connectionId, layers]) => [
+        connectionId,
+        layers[0]!,
+      ]),
+    )
+    if (placement) {
+      layerByConnection = Object.fromEntries(
+        placement.breakoutPoints.map((point) => [
+          point.connectionId,
+          point.layer,
+        ]),
+      )
+    }
     const visibleDestinations = oneRegionExternalDestinations.filter(
       (destination) => {
         const connection = connections.find(
@@ -28,7 +44,7 @@ export class OneRegionDestinationVisualizationSolver extends WindingBreakoutSolv
         return (
           connection &&
           (!this.activeDestinationLayer ||
-            connection.layer === this.activeDestinationLayer)
+            layerByConnection[connection.id] === this.activeDestinationLayer)
         )
       },
     )
@@ -41,7 +57,9 @@ export class OneRegionDestinationVisualizationSolver extends WindingBreakoutSolv
         ...destination.position,
         color: getConnectionColor(destination.connectionId),
         label: `${destination.connectionId} · external destination (not a breakout point)`,
-        layer: getGraphicsLayer(this.inputProblem, [connection.layer]),
+        layer: getGraphicsLayer(this.inputProblem, [
+          layerByConnection[connection.id]!,
+        ]),
       }
     })
     let destinationLines: NonNullable<GraphicsObject["lines"]> = []
@@ -61,7 +79,9 @@ export class OneRegionDestinationVisualizationSolver extends WindingBreakoutSolv
             strokeWidth: 0.018,
             strokeDash: [0.06, 0.05],
             label: `${destination.connectionId} breakout continuation`,
-            layer: getGraphicsLayer(this.inputProblem, [connection.layer]),
+            layer: getGraphicsLayer(this.inputProblem, [
+              layerByConnection[connection.id]!,
+            ]),
           },
         ]
       })
@@ -76,7 +96,9 @@ export class OneRegionDestinationVisualizationSolver extends WindingBreakoutSolv
         fill: "#ffffff",
         stroke: getConnectionColor(destination.connectionId),
         label: `${destination.connectionId} external destination`,
-        layer: getGraphicsLayer(this.inputProblem, [connection.layer]),
+        layer: getGraphicsLayer(this.inputProblem, [
+          layerByConnection[connection.id]!,
+        ]),
       }
     })
     const destinationTexts = visibleDestinations.map((destination) => {
@@ -90,7 +112,9 @@ export class OneRegionDestinationVisualizationSolver extends WindingBreakoutSolv
         anchorSide: "center_left" as const,
         color: getConnectionColor(destination.connectionId),
         fontSize: 0.18,
-        layer: getGraphicsLayer(this.inputProblem, [connection.layer]),
+        layer: getGraphicsLayer(this.inputProblem, [
+          layerByConnection[connection.id]!,
+        ]),
       }
     })
 

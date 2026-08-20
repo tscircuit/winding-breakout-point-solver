@@ -151,7 +151,7 @@ export class WindingBreakoutSolver extends BasePipelineSolver<WindingBreakoutSol
       activeLayer: this.visualizationLayer,
       phase: "Input · Validated during setup",
       detail:
-        "Region bounds, breakout edges, connection layers, and canonical endpoints",
+        "Region bounds, breakout edges, bus layer preferences, and canonical endpoints",
     })
   }
 
@@ -164,7 +164,7 @@ export class WindingBreakoutSolver extends BasePipelineSolver<WindingBreakoutSol
       activeLayer: this.visualizationLayer,
       phase: "Output · Validated after gate placement",
       detail:
-        "Valid: one layer-preserving breakout point per connection and region; pairs are adjacent",
+        "Valid: one bus-constrained breakout point per connection and region; pairs are adjacent",
       state: {
         referenceOrder: ordering.referenceOrder,
         breakoutPoints: this.output.breakoutPoints,

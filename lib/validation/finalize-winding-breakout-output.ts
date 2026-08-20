@@ -11,17 +11,10 @@ export const finalizeWindingBreakoutOutput = ({
   validated: ValidatedWindingInput
   placement: GatePlacementResult
 }): WindingBreakoutOutput => {
-  const layerByConnection = Object.fromEntries(
-    validated.connections.map((connection) => [
-      connection.id,
-      connection.layer,
-    ]),
-  )
   const valid = validateBreakoutPoints({
     points: placement.breakoutPoints,
     connectionIds: validated.connections.map((connection) => connection.id),
     regions: validated.regions,
-    layerByConnection,
     atomicGroups: validated.atomicConnectionGroups,
   })
   if (!valid) {

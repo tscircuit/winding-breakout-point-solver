@@ -2,10 +2,12 @@ import type {
   Bounds,
   ConnectionEndpoint,
   Point,
+  WindingBreakoutBusInput,
   WindingBreakoutRegion,
   WindingBreakoutSolverInput,
 } from "../types"
 import { WindingBreakoutInputError } from "./errors"
+import { getBusLayerCandidates } from "./get-bus-layer-candidates"
 
 export interface ValidatedRegion extends WindingBreakoutRegion {
   readonly center: Point
@@ -13,13 +15,15 @@ export interface ValidatedRegion extends WindingBreakoutRegion {
 
 export interface ValidatedConnection {
   readonly id: string
-  readonly layer: string
   readonly endpoints: readonly ConnectionEndpoint[]
 }
+
+export interface ValidatedBus extends WindingBreakoutBusInput {}
 
 export interface ValidatedWindingInput {
   readonly regions: readonly ValidatedRegion[]
   readonly connections: readonly ValidatedConnection[]
+  readonly buses: readonly ValidatedBus[]
   readonly layerNames: readonly string[]
   readonly atomicConnectionGroups: readonly (readonly [string, string])[]
 }
@@ -149,23 +153,14 @@ export const validateWindingBreakoutInput = (
   const validateConnection = (
     value: unknown,
     label: string,
-    inheritedLayer?: string,
   ): ValidatedConnection => {
     requireRecord(value, label)
     requireId(value.id, `${label}.id`)
     if (connectionIds.has(value.id)) {
       fail(`duplicate connection id "${value.id}"`)
     }
-
-    let layer: string
-    if (inheritedLayer === undefined) {
-      requireId(value.layer, `${label}.layer`)
-      layer = value.layer
-    } else {
-      if ("layer" in value) {
-        fail(`${label} must inherit its differential-pair layer`)
-      }
-      layer = inheritedLayer
+    if ("layer" in value) {
+      fail(`${label}.layer is not accepted; declare layer preferences on a bus`)
     }
 
     const endpointValues = requireArray(
@@ -215,7 +210,7 @@ export const validateWindingBreakoutInput = (
     }
 
     connectionIds.add(value.id)
-    return { id: value.id, layer, endpoints }
+    return { id: value.id, endpoints }
   }
 
   for (const [index, value] of input.connections.entries()) {
@@ -225,7 +220,11 @@ export const validateWindingBreakoutInput = (
       if (value.type !== "differential") {
         fail(`${label} has invalid differential-pair type`)
       }
-      requireId(value.layer, `${label}.layer`)
+      if ("layer" in value) {
+        fail(
+          `${label}.layer is not accepted; declare layer preferences on a bus`,
+        )
+      }
       const pairConnections = requireArray(
         value.connections,
         `${label}.connections must contain exactly two members`,
@@ -236,12 +235,10 @@ export const validateWindingBreakoutInput = (
       const first = validateConnection(
         pairConnections[0],
         `${label}.connections[0]`,
-        value.layer,
       )
       const second = validateConnection(
         pairConnections[1],
         `${label}.connections[1]`,
-        value.layer,
       )
       if (first.id === second.id) {
         fail(`${label} members must have distinct connection ids`)
@@ -253,8 +250,112 @@ export const validateWindingBreakoutInput = (
     }
   }
 
+  const busValues = requireArray(input.buses, "buses must be an array")
+  const busIds = new Set<string>()
+  const busByConnection = new Map<string, string>()
+  const buses: ValidatedBus[] = busValues.map((value, busIndex) => {
+    const label = `buses[${busIndex}]`
+    requireRecord(value, label)
+    requireId(value.id, `${label}.id`)
+    const busId = value.id
+    if (busIds.has(busId)) fail(`duplicate bus id "${busId}"`)
+    busIds.add(busId)
+
+    const connectionIdValues = requireArray(
+      value.connectionIds,
+      `${label}.connectionIds must be a non-empty array`,
+    )
+    if (connectionIdValues.length === 0) {
+      fail(`${label}.connectionIds must be a non-empty array`)
+    }
+    const localConnectionIds = new Set<string>()
+    const busConnectionIds = connectionIdValues.map(
+      (connectionId, connectionIndex) => {
+        requireId(connectionId, `${label}.connectionIds[${connectionIndex}]`)
+        if (!connectionIds.has(connectionId)) {
+          fail(`${label} references unknown connection "${connectionId}"`)
+        }
+        if (localConnectionIds.has(connectionId)) {
+          fail(`${label} contains duplicate connection "${connectionId}"`)
+        }
+        localConnectionIds.add(connectionId)
+        const previousBusId = busByConnection.get(connectionId)
+        if (previousBusId !== undefined) {
+          fail(
+            `connection "${connectionId}" belongs to multiple buses "${previousBusId}" and "${value.id}"`,
+          )
+        }
+        busByConnection.set(connectionId, busId)
+        return connectionId
+      },
+    )
+
+    let preferredLayer: string | undefined
+    if (value.preferredLayer !== undefined) {
+      requireId(value.preferredLayer, `${label}.preferredLayer`)
+      preferredLayer = value.preferredLayer
+    }
+
+    let preferredLayers: string[] | undefined
+    if (value.preferredLayers !== undefined) {
+      const preferredLayerValues = requireArray(
+        value.preferredLayers,
+        `${label}.preferredLayers must be a non-empty array`,
+      )
+      if (preferredLayerValues.length === 0) {
+        fail(`${label}.preferredLayers must be a non-empty array`)
+      }
+      const uniquePreferredLayers = new Set<string>()
+      preferredLayers = preferredLayerValues.map((layer, layerIndex) => {
+        requireId(layer, `${label}.preferredLayers[${layerIndex}]`)
+        if (uniquePreferredLayers.has(layer)) {
+          fail(`${label}.preferredLayers contains duplicate layer "${layer}"`)
+        }
+        uniquePreferredLayers.add(layer)
+        return layer
+      })
+    }
+
+    let validatedBus: ValidatedBus = {
+      id: busId,
+      connectionIds: busConnectionIds,
+    }
+    if (preferredLayer !== undefined) {
+      validatedBus = { ...validatedBus, preferredLayer }
+    }
+    if (preferredLayers !== undefined) {
+      validatedBus = { ...validatedBus, preferredLayers }
+    }
+    return validatedBus
+  })
+
+  for (const [
+    firstConnectionId,
+    secondConnectionId,
+  ] of atomicConnectionGroups) {
+    const firstBusId = busByConnection.get(firstConnectionId)
+    const secondBusId = busByConnection.get(secondConnectionId)
+    if (firstBusId !== secondBusId) {
+      fail(
+        `differential pair "${firstConnectionId}/${secondConnectionId}" must belong to the same bus`,
+      )
+    }
+  }
+
   const layerNames = [
-    ...new Set(connections.map((connection) => connection.layer)),
+    ...new Set([
+      ...buses.flatMap((bus) => getBusLayerCandidates(bus)),
+      ...connections
+        .filter((connection) => !busByConnection.has(connection.id))
+        .map(() => "top"),
+    ]),
   ].sort((first, second) => first.localeCompare(second))
-  return { regions, connections, layerNames, atomicConnectionGroups }
+
+  return {
+    regions,
+    connections,
+    buses,
+    layerNames,
+    atomicConnectionGroups,
+  }
 }

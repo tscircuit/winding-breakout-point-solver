@@ -61,6 +61,7 @@ export class ReferenceOrderingSolver extends BaseSolver {
     const referenceOrder = getReferenceWindingOrder(
       this.naturalOrderByRegion[firstRegion.id]!,
       this.params.validated.atomicConnectionGroups,
+      this.params.validated.buses,
     )
     this.output = {
       naturalOrderByRegion: this.naturalOrderByRegion,
@@ -102,7 +103,7 @@ export class ReferenceOrderingSolver extends BaseSolver {
       detail = `Natural order for region “${this.visualizedRegionId}” · ${this.currentRegionIndex}/${this.params.validated.regions.length} regions processed`
     }
     if (this.output) {
-      detail = `Reference region “${firstRegionId}” finalized; differential pairs were made adjacent and atomic`
+      detail = `Reference region “${firstRegionId}” finalized; buses are contiguous and differential pairs are atomic`
     }
     return createSolverPhaseVisualization({
       input: this.params.input,

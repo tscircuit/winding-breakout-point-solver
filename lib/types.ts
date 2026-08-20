@@ -25,32 +25,41 @@ export interface ConnectionEndpoint {
 
 export interface ConnectionInput {
   readonly id: string
-  readonly layer: string
   readonly endpoints: readonly ConnectionEndpoint[]
 }
 
 export interface DifferentialPairInput {
   readonly type: "differential"
-  readonly layer: string
-  readonly connections: readonly [
-    Omit<ConnectionInput, "layer">,
-    Omit<ConnectionInput, "layer">,
-  ]
+  readonly connections: readonly [ConnectionInput, ConnectionInput]
 }
 
 export type ConnectionOrDifferentialPair =
   | ConnectionInput
   | DifferentialPairInput
 
+export interface WindingBreakoutBusInput {
+  readonly id: string
+  readonly connectionIds: readonly string[]
+  /**
+   * NOTE: Despite the legacy JSX name, preferredLayer is a permanent layer
+   * assignment for every connection in this bus, not a soft preference.
+   */
+  readonly preferredLayer?: string
+  /** Ordered candidate layers that the solver may distribute this bus over. */
+  readonly preferredLayers?: readonly string[]
+}
+
 export interface WindingBreakoutSolverInput {
   readonly regions: readonly WindingBreakoutRegion[]
   readonly connections: readonly ConnectionOrDifferentialPair[]
+  readonly buses: readonly WindingBreakoutBusInput[]
   readonly boundaryPointSpacing: number
 }
 
 export interface BreakoutPoint extends Point {
   readonly regionId: string
   readonly connectionId: string
+  readonly layer: string
 }
 
 export interface WindingBreakoutOutput {

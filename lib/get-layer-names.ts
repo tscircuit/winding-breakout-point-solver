@@ -1,11 +1,9 @@
-import { getCanonicalConnections } from "./input/get-canonical-connections"
+import { getLayerCandidatesByConnection } from "./input/get-bus-layer-candidates"
 import type { WindingBreakoutSolverInput } from "./types"
 
 export const getLayerNames = (
-  input: Pick<WindingBreakoutSolverInput, "connections">,
+  input: Pick<WindingBreakoutSolverInput, "buses" | "connections">,
 ): string[] =>
   [
-    ...new Set(
-      getCanonicalConnections(input).map((connection) => connection.layer),
-    ),
+    ...new Set(Object.values(getLayerCandidatesByConnection(input)).flat()),
   ].sort((first, second) => first.localeCompare(second))
