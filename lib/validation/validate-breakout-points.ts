@@ -1,3 +1,4 @@
+import type { SelectedBreakoutEdgeByRegionConnection } from "../gate-placement/select-breakout-edges"
 import type { ValidatedRegion } from "../input/validate-winding-breakout-input"
 import type { BreakoutPoint } from "../types"
 
@@ -6,11 +7,13 @@ export const validateBreakoutPoints = ({
   connectionIds,
   regions,
   atomicGroups,
+  selectedEdgeByRegionConnection,
 }: {
   points: readonly BreakoutPoint[]
   connectionIds: readonly string[]
   regions: readonly ValidatedRegion[]
   atomicGroups: readonly (readonly [string, string])[]
+  selectedEdgeByRegionConnection: SelectedBreakoutEdgeByRegionConnection
 }): boolean => {
   const regionIds = regions.map((region) => region.id)
   const endpointCounts = new Map<string, number>()
@@ -31,6 +34,23 @@ export const validateBreakoutPoints = ({
   const endpointsAreValid =
     endpointCounts.size === expected.length &&
     expected.every((endpoint) => endpointCounts.get(endpoint) === 1)
+  const pointsAreOnSelectedEdges = points.every((point) => {
+    const region = regions.find((candidate) => candidate.id === point.regionId)
+    const edge = selectedEdgeByRegionConnection
+      .get(point.regionId)
+      ?.get(point.connectionId)
+    if (!region || !edge) return false
+    const insideBounds =
+      point.x >= region.bounds.minX &&
+      point.x <= region.bounds.maxX &&
+      point.y >= region.bounds.minY &&
+      point.y <= region.bounds.maxY
+    if (!insideBounds) return false
+    if (edge === "left") return point.x === region.bounds.minX
+    if (edge === "right") return point.x === region.bounds.maxX
+    if (edge === "bottom") return point.y === region.bounds.minY
+    return point.y === region.bounds.maxY
+  })
   const atomicGroupsAreValid = atomicGroups.every((group) => {
     const layer = layerByConnection.get(group[0]!)
     if (!layer) return false
@@ -42,10 +62,26 @@ export const validateBreakoutPoints = ({
       return false
     }
     return regions.every((region) => {
+      const edge = selectedEdgeByRegionConnection.get(region.id)?.get(group[0]!)
+      if (
+        !edge ||
+        group.some(
+          (connectionId) =>
+            selectedEdgeByRegionConnection.get(region.id)?.get(connectionId) !==
+            edge,
+        )
+      ) {
+        return false
+      }
       const layerPoints = points.filter(
-        (point) => point.regionId === region.id && point.layer === layer,
+        (point) =>
+          point.regionId === region.id &&
+          point.layer === layer &&
+          selectedEdgeByRegionConnection
+            .get(region.id)
+            ?.get(point.connectionId) === edge,
       )
-      const vertical = region.edge === "left" || region.edge === "right"
+      const vertical = edge === "left" || edge === "right"
       const orderedConnectionIds = [...layerPoints]
         .sort((first, second) =>
           vertical ? first.y - second.y : first.x - second.x,
@@ -60,5 +96,10 @@ export const validateBreakoutPoints = ({
       )
     })
   })
-  return endpointsAreValid && connectionLayersAreValid && atomicGroupsAreValid
+  return (
+    endpointsAreValid &&
+    pointsAreOnSelectedEdges &&
+    connectionLayersAreValid &&
+    atomicGroupsAreValid
+  )
 }

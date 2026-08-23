@@ -125,6 +125,23 @@ test("points outside region bounds fail validation", async () => {
   )
 })
 
+test("non-finite external destinations fail validation", async () => {
+  await expectInputError(
+    withFirstConnection((connection) => ({
+      ...connection,
+      endpoints: connection.endpoints.map((endpoint, index) =>
+        index === 0
+          ? {
+              ...endpoint,
+              externalDestination: { x: Number.NaN, y: 0 },
+            }
+          : endpoint,
+      ),
+    })),
+    "connections[0].endpoints[0].externalDestination.x must be finite",
+  )
+})
+
 test("invalid differential pairs fail validation", async () => {
   const input = cloneInput(ddrByte0Example)
   const pairIndex = input.connections.findIndex(

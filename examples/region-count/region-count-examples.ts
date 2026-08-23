@@ -66,12 +66,20 @@ export const oneRegionExternalDestinations: readonly ExternalConnectionDestinati
 
 const makeConnections = (
   regionIds: readonly (keyof typeof regionCatalog)[],
+  includeExternalDestinations = false,
 ): ConnectionOrDifferentialPair[] => {
-  const endpoints = (connectionId: ExampleConnectionId) =>
-    regionIds.map((regionId) => ({
+  const endpoints = (connectionId: ExampleConnectionId) => {
+    const externalDestination = oneRegionExternalDestinations.find(
+      (destination) => destination.connectionId === connectionId,
+    )?.position
+    return regionIds.map((regionId) => ({
       regionId,
       position: positionsByRegion[regionId][connectionId]!,
+      ...(includeExternalDestinations && externalDestination
+        ? { externalDestination }
+        : {}),
     }))
+  }
 
   // Deliberately not in geometric order: reference order must come from pads.
   return [
@@ -90,9 +98,10 @@ const makeConnections = (
 
 const makeExample = (
   regionIds: readonly (keyof typeof regionCatalog)[],
+  includeExternalDestinations = false,
 ): WindingBreakoutSolverInput => ({
   regions: regionIds.map((regionId) => regionCatalog[regionId]),
-  connections: makeConnections(regionIds),
+  connections: makeConnections(regionIds, includeExternalDestinations),
   buses: [
     {
       id: "data-control",
@@ -109,7 +118,7 @@ const makeExample = (
 })
 
 export const oneRegionExample: WindingBreakoutSolverInput = {
-  ...makeExample(["source"]),
+  ...makeExample(["source"], true),
   regions: [
     {
       ...regionCatalog.source,

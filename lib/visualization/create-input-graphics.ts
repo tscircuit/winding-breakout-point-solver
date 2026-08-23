@@ -12,9 +12,10 @@ export const createInputGraphics = (
   activeLayer?: string,
 ): GraphicsObject => {
   const graphics: Required<
-    Pick<GraphicsObject, "circles" | "rects" | "texts">
+    Pick<GraphicsObject, "circles" | "points" | "rects" | "texts">
   > = {
     circles: [],
+    points: [],
     rects: [],
     texts: [],
   }
@@ -54,6 +55,14 @@ export const createInputGraphics = (
         stroke: color,
         layer: getGraphicsLayer(input, layerCandidates),
       })
+      if (endpoint.externalDestination) {
+        graphics.points.push({
+          ...endpoint.externalDestination,
+          color,
+          label: `${connection.id} · external destination`,
+          layer: getGraphicsLayer(input, layerCandidates),
+        })
+      }
     }
     graphics.texts.push({
       x: center.x,

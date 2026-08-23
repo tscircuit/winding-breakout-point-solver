@@ -73,6 +73,7 @@ export class GatePlacementSolver extends BaseSolver {
         layerByConnection: this.layerByConnection,
         boundaryPointSpacing: this.params.input.boundaryPointSpacing,
         atomicGroups: this.params.validated.atomicConnectionGroups,
+        buses: this.params.validated.buses,
       })
       this.stats = {
         phase: "plan-gate-grid",

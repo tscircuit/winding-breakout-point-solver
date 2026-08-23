@@ -21,6 +21,12 @@ export interface WindingBreakoutRegion {
 export interface ConnectionEndpoint {
   readonly regionId: string
   readonly position: Point
+  /**
+   * Optional routing destination beyond this breakout region. The point uses
+   * the same coordinate frame and units as `position`. Single-region solves
+   * may use it to choose and align a nearer boundary edge.
+   */
+  readonly externalDestination?: Point
 }
 
 export interface ConnectionInput {

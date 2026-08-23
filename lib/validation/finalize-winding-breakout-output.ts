@@ -16,6 +16,7 @@ export const finalizeWindingBreakoutOutput = ({
     connectionIds: validated.connections.map((connection) => connection.id),
     regions: validated.regions,
     atomicGroups: validated.atomicConnectionGroups,
+    selectedEdgeByRegionConnection: placement.selectedEdgeByRegionConnection,
   })
   if (!valid) {
     throw new WindingBreakoutInvariantError(

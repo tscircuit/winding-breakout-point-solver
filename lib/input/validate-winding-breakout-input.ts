@@ -188,6 +188,13 @@ export const validateWindingBreakoutInput = (
           endpointValue.position,
           `${endpointLabel}.position`,
         )
+        const externalDestination =
+          endpointValue.externalDestination === undefined
+            ? undefined
+            : validatePoint(
+                endpointValue.externalDestination,
+                `${endpointLabel}.externalDestination`,
+              )
         const region = regions.find(
           (candidate) => candidate.id === endpointValue.regionId,
         )!
@@ -196,7 +203,11 @@ export const validateWindingBreakoutInput = (
             `${label} endpoint for region "${region.id}" is outside its bounds`,
           )
         }
-        return { regionId: endpointValue.regionId, position }
+        return {
+          regionId: endpointValue.regionId,
+          position,
+          ...(externalDestination ? { externalDestination } : {}),
+        }
       },
     )
 
