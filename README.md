@@ -167,6 +167,9 @@ The solver derives each region center from its bounds, uses the first region's
 endpoint geometry as the reference winding, and derives its layer stagger as
 `boundaryPointSpacing / 2`. Buses are kept contiguous; fixed buses remain on
 `preferredLayer`, while flexible buses are distributed over `preferredLayers`.
+When parallel region edges overlap, their gates share one aligned slot grid.
+When their projections are disjoint, each region receives a locally clamped
+grid while retaining the same connection order, layers, and stagger offsets.
 
 `getOutput()` is unavailable until the solver completes successfully. Input
 validation runs during solver setup. The `BasePipelineSolver` then runs two

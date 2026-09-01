@@ -91,49 +91,73 @@ const makeGateAxes = ({
   spacing: number
   count: number
   layerOffsets: Readonly<Record<string, number>>
-}): { vertical: boolean; axes: number[] } => {
+}): { vertical: boolean; axesByRegionId: ReadonlyMap<string, number[]> } => {
   const vertical = regions.every((region) => isVerticalEdge(region.edge))
-  const minAxis = Math.max(
-    ...regions.map((region) => getAxisMinimum(region, vertical)),
-  )
-  const maxAxis = Math.min(
-    ...regions.map((region) => getAxisMaximum(region, vertical)),
-  )
   const minimumOffset = Math.min(...Object.values(layerOffsets))
   const maximumOffset = Math.max(...Object.values(layerOffsets))
   const span = spacing * Math.max(0, count - 1) + maximumOffset - minimumOffset
-  if (maxAxis - minAxis + GEOMETRY_EPSILON < span) {
-    throw new WindingBreakoutInfeasibleError(
-      `WindingBreakoutSolver: declared breakout edges need ${span.toFixed(2)}mm but expose only ${(maxAxis - minAxis).toFixed(2)}mm`,
+  const makeAxesForRegions = (
+    axisRegions: readonly ValidatedRegion[],
+  ): number[] => {
+    const minAxis = Math.max(
+      ...axisRegions.map((region) => getAxisMinimum(region, vertical)),
     )
+    const maxAxis = Math.min(
+      ...axisRegions.map((region) => getAxisMaximum(region, vertical)),
+    )
+    if (maxAxis - minAxis + GEOMETRY_EPSILON < span) {
+      throw new WindingBreakoutInfeasibleError(
+        `WindingBreakoutSolver: declared breakout edges need ${span.toFixed(2)}mm but expose only ${(maxAxis - minAxis).toFixed(2)}mm`,
+      )
+    }
+    const meanAxis =
+      axisRegions.reduce((regionSum, region) => {
+        const positions = connections.map(
+          (connection) =>
+            connection.endpoints.find(
+              (endpoint) => endpoint.regionId === region.id,
+            )!.position,
+        )
+        return (
+          regionSum +
+          positions.reduce(
+            (sum, position) => sum + getAxisPosition(position, vertical),
+            0,
+          ) /
+            positions.length
+        )
+      }, 0) / axisRegions.length
+    const start = Math.max(
+      minAxis - minimumOffset,
+      Math.min(
+        maxAxis - spacing * Math.max(0, count - 1) - maximumOffset,
+        meanAxis - (spacing * Math.max(0, count - 1)) / 2,
+      ),
+    )
+    return Array.from({ length: count }, (_, index) => start + index * spacing)
   }
-  const meanAxis =
-    regions.reduce((regionSum, region) => {
-      const positions = connections.map(
-        (connection) =>
-          connection.endpoints.find(
-            (endpoint) => endpoint.regionId === region.id,
-          )!.position,
-      )
-      return (
-        regionSum +
-        positions.reduce(
-          (sum, position) => sum + getAxisPosition(position, vertical),
-          0,
-        ) /
-          positions.length
-      )
-    }, 0) / regions.length
-  const start = Math.max(
-    minAxis - minimumOffset,
-    Math.min(
-      maxAxis - spacing * Math.max(0, count - 1) - maximumOffset,
-      meanAxis - (spacing * Math.max(0, count - 1)) / 2,
-    ),
+
+  const sharedMinimum = Math.max(
+    ...regions.map((region) => getAxisMinimum(region, vertical)),
   )
+  const sharedMaximum = Math.min(
+    ...regions.map((region) => getAxisMaximum(region, vertical)),
+  )
+  if (sharedMaximum - sharedMinimum + GEOMETRY_EPSILON >= span) {
+    const sharedAxes = makeAxesForRegions(regions)
+    return {
+      vertical,
+      axesByRegionId: new Map(
+        regions.map((region) => [region.id, sharedAxes] as const),
+      ),
+    }
+  }
+
   return {
     vertical,
-    axes: Array.from({ length: count }, (_, index) => start + index * spacing),
+    axesByRegionId: new Map(
+      regions.map((region) => [region.id, makeAxesForRegions([region])]),
+    ),
   }
 }
 
@@ -195,15 +219,16 @@ export const placeBreakoutGates = ({
         ).length,
     ),
   )
-  const { vertical, axes } = makeGateAxes({
+  const { vertical, axesByRegionId } = makeGateAxes({
     regions,
     connections,
     spacing: boundaryPointSpacing,
     count: maxLayerNetCount,
     layerOffsets,
   })
-  const breakoutPoints = regions.flatMap((region) =>
-    layerNames.flatMap((layer) =>
+  const breakoutPoints = regions.flatMap((region) => {
+    const axes = axesByRegionId.get(region.id)!
+    return layerNames.flatMap((layer) =>
       gateOrderByLayer[layer]!.map((connectionId, slotIndex) => ({
         regionId: region.id,
         connectionId,
@@ -214,7 +239,7 @@ export const placeBreakoutGates = ({
           vertical,
         ),
       })),
-    ),
-  )
+    )
+  })
   return { breakoutPoints }
 }
