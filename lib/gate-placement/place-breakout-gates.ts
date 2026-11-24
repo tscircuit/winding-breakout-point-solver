@@ -71,24 +71,38 @@ const makeGateAxes = ({
   spacing,
   count,
   layerOffsets,
+  connectionCountByLayer,
 }: {
   regions: readonly ValidatedRegion[]
   connections: readonly ValidatedConnection[]
   spacing: number
   count: number
   layerOffsets: Readonly<Record<string, number>>
+  connectionCountByLayer: Readonly<Record<string, number>>
 }): { vertical: boolean; axes: number[] } => {
-  const { vertical, minAxis, maxAxis, capacityPerLayer } = getGateAxisLayout({
+  const { vertical, minAxis, maxAxis } = getGateAxisLayout({
     regions,
     spacing,
     layerCount: Object.keys(layerOffsets).length,
   })
+  const layerOffsetEntries = Object.entries(layerOffsets)
   const minimumOffset = Math.min(...Object.values(layerOffsets))
-  const maximumOffset = Math.max(...Object.values(layerOffsets))
-  const span = spacing * Math.max(0, count - 1) + maximumOffset - minimumOffset
-  if (count > capacityPerLayer) {
+  const earliestStart = minAxis - minimumOffset
+  const latestStart = Math.min(
+    ...layerOffsetEntries.map(([layer, offset]) => {
+      const layerCount = connectionCountByLayer[layer] ?? 0
+      return maxAxis - spacing * Math.max(0, layerCount - 1) - offset
+    }),
+  )
+  const requiredSpan = Math.max(
+    ...layerOffsetEntries.map(([layer, offset]) => {
+      const layerCount = connectionCountByLayer[layer] ?? 0
+      return spacing * Math.max(0, layerCount - 1) + offset - minimumOffset
+    }),
+  )
+  if (earliestStart > latestStart + 1e-9) {
     throw new WindingBreakoutInfeasibleError(
-      `WindingBreakoutSolver: declared breakout edges need ${span.toFixed(2)}mm but expose only ${(maxAxis - minAxis).toFixed(2)}mm`,
+      `WindingBreakoutSolver: declared breakout edges need ${requiredSpan.toFixed(2)}mm but expose only ${(maxAxis - minAxis).toFixed(2)}mm`,
     )
   }
   const meanAxis =
@@ -109,11 +123,8 @@ const makeGateAxes = ({
       )
     }, 0) / regions.length
   const start = Math.max(
-    minAxis - minimumOffset,
-    Math.min(
-      maxAxis - spacing * Math.max(0, count - 1) - maximumOffset,
-      meanAxis - (spacing * Math.max(0, count - 1)) / 2,
-    ),
+    earliestStart,
+    Math.min(latestStart, meanAxis - (spacing * Math.max(0, count - 1)) / 2),
   )
   return {
     vertical,
@@ -171,20 +182,17 @@ export const placeBreakoutGates = ({
       }),
     ]),
   )
-  const maxLayerNetCount = Math.max(
-    ...layerNames.map(
-      (layer) =>
-        connections.filter(
-          (connection) => layerByConnection[connection.id] === layer,
-        ).length,
-    ),
+  const connectionCountByLayer = Object.fromEntries(
+    layerNames.map((layer) => [layer, gateOrderByLayer[layer]!.length]),
   )
+  const maxLayerNetCount = Math.max(...Object.values(connectionCountByLayer))
   const { vertical, axes } = makeGateAxes({
     regions,
     connections,
     spacing: boundaryPointSpacing,
     count: maxLayerNetCount,
     layerOffsets,
+    connectionCountByLayer,
   })
   const breakoutPoints = regions.flatMap((region) =>
     layerNames.flatMap((layer) =>
